@@ -1,0 +1,62 @@
+name: Termine image
+# -----------------------------------------------------------------
+# Builds the fork's container image and publishes it to the GitHub
+# Container Registry as ghcr.io/<owner>/rallly.
+# Trigger: a tag "termine-<version>", e.g. termine-4.16.1-1, which
+# becomes the image tag 4.16.1-1. Deployments pin that tag.
+# -----------------------------------------------------------------
+on:
+  push:
+    tags:
+      - "termine-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build & Push Container Image
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Image Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/rallly
+          tags: |
+            type=match,pattern=termine-(.*),group=1
+            type=sha,format=short
+
+      - name: Resolve App Version
+        id: version
+        run: echo "app_version=${GITHUB_REF_NAME#termine-}" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.app_version }}
+            SELF_HOSTED=true

@@ -117,11 +117,19 @@ test.describe
       await loginWithEmail(page, { email: ADMIN_EMAIL });
       await page.goto("/control-panel/design");
 
-      await page
-        .locator("input[type=file][accept*='image/svg+xml']")
-        .first()
-        .setInputFiles(path.join(__dirname, "../public/images/logo-mark.png"));
-      await expect(page.getByText("Saved").first()).toBeVisible();
+      // A file chosen before hydration is lost, so the pick is retried until
+      // the upload confirms; saving the same file twice is harmless
+      await expect(async () => {
+        await page
+          .locator("input[type=file][accept*='image/svg+xml']")
+          .first()
+          .setInputFiles(
+            path.join(__dirname, "../public/images/logo-mark.png"),
+          );
+        await expect(page.getByText("Saved").first()).toBeVisible({
+          timeout: 3000,
+        });
+      }).toPass();
 
       await expect
         .poll(async () => {
@@ -147,19 +155,21 @@ test.describe
       await loginWithEmail(page, { email: ADMIN_EMAIL });
       await page.goto("/control-panel/design");
 
-      // A PNG offered as a font is refused by its content, not its name
-      await page
-        .locator("input[type=file][accept*='.woff2']")
-        .first()
-        .setInputFiles({
-          name: "not-a-font.woff2",
-          mimeType: "font/woff2",
-          buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]),
-        });
-
-      await expect(
-        page.getByText("This file type is not supported here."),
-      ).toBeVisible();
+      // A PNG offered as a font is refused by its content, not its name.
+      // Retried like the upload above, for a pick made before hydration.
+      await expect(async () => {
+        await page
+          .locator("input[type=file][accept*='.woff2']")
+          .first()
+          .setInputFiles({
+            name: "not-a-font.woff2",
+            mimeType: "font/woff2",
+            buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]),
+          });
+        await expect(
+          page.getByText("This file type is not supported here."),
+        ).toBeVisible({ timeout: 3000 });
+      }).toPass();
       await expect(
         prisma.instanceAsset.count({ where: { key: "fontHeading" } }),
       ).resolves.toBe(0);
