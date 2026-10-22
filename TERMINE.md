@@ -83,7 +83,8 @@ Einträge (`calendar_holds`).
 
 Ein Tag `termine-<rallly-version>-<n>` (z. B. `termine-4.16.1-1`) startet den
 Workflow `.github/workflows/termine-image.yml`. Er baut das Image und
-veröffentlicht es als `ghcr.io/<owner>/rallly:<rallly-version>-<n>`. Im
+veröffentlicht es als
+`ghcr.io/emlebentommy/rallly-termin-kalender:<rallly-version>-<n>`. Im
 Deployment wird immer dieses feste Tag eingetragen, nie `latest`.
 
 ## Upstream-Updates übernehmen

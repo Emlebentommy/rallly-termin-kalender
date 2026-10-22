@@ -1,7 +1,7 @@
 name: Termine image
 # -----------------------------------------------------------------
 # Builds the fork's container image and publishes it to the GitHub
-# Container Registry as ghcr.io/<owner>/rallly.
+# Container Registry as ghcr.io/<owner>/<repository>.
 # Trigger: a tag "termine-<version>", e.g. termine-4.16.1-1, which
 # becomes the image tag 4.16.1-1. Deployments pin that tag.
 # -----------------------------------------------------------------
@@ -34,7 +34,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/rallly
+          images: ghcr.io/${{ github.repository }}
           tags: |
             type=match,pattern=termine-(.*),group=1
             type=sha,format=short
