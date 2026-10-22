@@ -82,10 +82,16 @@ Einträge (`calendar_holds`).
 ## Image bauen und deployen
 
 Ein Tag `termine-<rallly-version>-<n>` (z. B. `termine-4.16.1-1`) startet den
-Workflow `.github/workflows/termine-image.yml`. Er baut das Image und
+Workflow `.github/workflows/termine-image.yml`; alternativ startet man ihn unter
+**Actions → Termine image → Run workflow** mit Version und Commit. Er baut das
+Image und
 veröffentlicht es als
 `ghcr.io/emlebentommy/rallly-termin-kalender:<rallly-version>-<n>`. Im
 Deployment wird immer dieses feste Tag eingetragen, nie `latest`.
+
+Gebaut wird nur ein Stand, der auf einem Rallly-Release aufsetzt (direkt nach
+dem Einmergen eines Release-Tags), nicht auf dem unveröffentlichten `main` von
+Rallly.
 
 ## Upstream-Updates übernehmen
 
