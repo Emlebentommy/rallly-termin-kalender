@@ -12,9 +12,11 @@ import {
   ChevronUpIcon,
   WandSparklesIcon,
 } from "lucide-react";
+import Image from "next/image";
 import React from "react";
 import { Link } from "@/components/link";
 import { LoginLink } from "@/components/login-link";
+import { connectToCalendar } from "@/features/calendars/client";
 import { CalDavConnectDialog } from "@/features/calendars/components/caldav-connect-dialog";
 import { Trans } from "@/i18n/client";
 import { useDateTime } from "@/lib/datetime/client";
@@ -58,6 +60,7 @@ function PanelHeading({
 
 function ConnectPrompt() {
   const dialog = useDialog();
+  const { availability } = usePollCalendar();
   return (
     <PanelFrame>
       <PanelHeading
@@ -81,8 +84,27 @@ function ConnectPrompt() {
             >
               <Trans i18nKey="pollCalendarMoreOptions" defaults="All options" />
             </Link>
+            {availability?.googleAvailable ? (
+              <Button onClick={() => connectToCalendar("google-calendar")}>
+                <Image
+                  src="/static/google-calendar.svg"
+                  width={16}
+                  height={16}
+                  alt=""
+                  unoptimized
+                />
+                <Trans
+                  i18nKey="connectGoogleCalendar"
+                  defaults="Google Calendar"
+                />
+              </Button>
+            ) : null}
             <Button onClick={() => dialog.trigger()}>
-              <Trans i18nKey="connectCalendar" defaults="Connect calendar" />
+              {availability?.googleAvailable ? (
+                <Trans i18nKey="connectCalDavShort" defaults="CalDAV" />
+              ) : (
+                <Trans i18nKey="connectCalendar" defaults="Connect calendar" />
+              )}
             </Button>
           </>
         }
@@ -94,18 +116,13 @@ function ConnectPrompt() {
 
 function SignInPrompt() {
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-muted-foreground text-sm">
-      <CalendarDaysIcon className="size-4" />
-      <span>
-        <Trans
-          i18nKey="pollCalendarSignIn"
-          defaults="Signed in, you can check these dates against your calendar."
-        />
-      </span>
-      <LoginLink className="font-medium text-foreground hover:underline">
-        <Trans i18nKey="login" defaults="Login" />
-      </LoginLink>
-    </div>
+    <LoginLink className="flex items-center gap-x-2 px-1 text-muted-foreground text-sm hover:text-foreground hover:underline">
+      <CalendarDaysIcon className="size-4 shrink-0" />
+      <Trans
+        i18nKey="pollCalendarSignIn"
+        defaults="Sign in to check these dates against your calendar"
+      />
+    </LoginLink>
   );
 }
 

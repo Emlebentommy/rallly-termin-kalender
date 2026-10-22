@@ -1,5 +1,6 @@
 import "server-only";
 
+import { env } from "@/env";
 import { CalDavCalendarService } from "@/features/calendars/caldav/service";
 import { GoogleCalendarService } from "@/features/calendars/google/service";
 import type { CalendarService } from "@/features/calendars/types";
@@ -152,6 +153,8 @@ export type PollAvailability = {
   preferences: Awaited<ReturnType<typeof getCalendarPreferences>>;
   /** The calendar answers are held in, when one is set */
   holdCalendarName: string | null;
+  /** Whether Google Calendar can be connected on this instance */
+  googleAvailable: boolean;
   options: OptionAvailability[];
   /** The calendars on each day of the poll, for the agenda */
   days: AvailabilityDay[];
@@ -177,6 +180,9 @@ export async function getPollAvailability({
 
   const userTimeZone =
     normalizeTimeZone(timeZone) ?? normalizeTimeZone(storedTimeZone) ?? "UTC";
+  const googleAvailable = Boolean(
+    env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET,
+  );
 
   const range = getAvailabilityRange(
     poll.options.map((option) =>
@@ -194,6 +200,7 @@ export async function getPollAvailability({
     timeZone: userTimeZone,
     preferences,
     holdCalendarName: holdCalendar?.name ?? null,
+    googleAvailable,
     options: [],
     days: [],
   };
@@ -219,6 +226,7 @@ export async function getPollAvailability({
     timeZone: userTimeZone,
     preferences,
     holdCalendarName: holdCalendar?.name ?? null,
+    googleAvailable,
     days: getAvailabilityDays({
       options: poll.options,
       events,

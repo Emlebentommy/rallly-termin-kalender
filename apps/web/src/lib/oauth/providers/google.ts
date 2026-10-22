@@ -18,6 +18,8 @@ interface GoogleOAuthClientConfig {
   clientSecret: string;
   callbackUrl?: string;
   scopes: string[];
+  /** Preselects this account in Google's account chooser */
+  loginHint?: string;
   onConnect?: (params: {
     providerAccountId: string;
     userInfo: UserInfo;
@@ -31,6 +33,7 @@ export class GoogleOAuthClient implements OAuthClient {
   private client: OAuth2ClientConfig;
   private clientId: string;
   private clientSecret: string;
+  private loginHint?: string;
   scopes: string[];
   onConnect?: (params: {
     providerAccountId: string;
@@ -43,8 +46,10 @@ export class GoogleOAuthClient implements OAuthClient {
     clientSecret,
     scopes,
     callbackUrl = "",
+    loginHint,
     onConnect,
   }: GoogleOAuthClientConfig) {
+    this.loginHint = loginHint;
     this.client = { clientId, clientSecret, redirectUri: callbackUrl };
     this.clientId = clientId;
     this.clientSecret = clientSecret;
@@ -67,6 +72,9 @@ export class GoogleOAuthClient implements OAuthClient {
     // later consent must return a token carrying every scope granted so far
     // rather than replacing them with only the newly requested ones.
     authUrl.searchParams.set("include_granted_scopes", "true");
+    if (this.loginHint) {
+      authUrl.searchParams.set("login_hint", this.loginHint);
+    }
 
     return authUrl;
   }

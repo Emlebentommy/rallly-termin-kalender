@@ -75,10 +75,13 @@ const { handler } = OAuthIntegration<Integration>({
         if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
           return null;
         }
+        // Someone signed in with Google most likely connects that account
+        const session = await getSession();
         return new GoogleOAuthClient({
           clientId: env.GOOGLE_CLIENT_ID,
           clientSecret: env.GOOGLE_CLIENT_SECRET,
           callbackUrl,
+          loginHint: session?.user.email ?? undefined,
           scopes: [
             "https://www.googleapis.com/auth/calendar.readonly",
             "https://www.googleapis.com/auth/calendar.events",
