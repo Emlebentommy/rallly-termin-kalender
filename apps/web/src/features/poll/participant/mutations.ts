@@ -3,6 +3,7 @@ import "server-only";
 import type { Prisma, VoteType } from "@rallly/database";
 import { prisma } from "@rallly/database";
 import { recordPollActivities } from "@/features/activity/mutations";
+import { scheduleCalendarHoldSync } from "@/features/calendars/holds/mutations";
 import { MAX_PARTICIPANTS } from "@/features/poll/constants";
 import {
   attachParticipantToInvite,
@@ -246,6 +247,7 @@ export async function addParticipant({
         },
       ]);
       scheduleWebhookDispatch({ pollId: pollId });
+      scheduleCalendarHoldSync({ pollId, userId });
 
       if (invite) {
         await attachParticipantToInvite(tx, {
@@ -315,7 +317,7 @@ export async function updateParticipantVotes({
       const participant = await tx.participant.update({
         where: { id: participantId },
         data: { updatedAt: new Date() },
-        select: { name: true },
+        select: { name: true, userId: true },
       });
 
       await recordPollActivities(tx, [
@@ -328,6 +330,9 @@ export async function updateParticipantVotes({
         },
       ]);
       scheduleWebhookDispatch({ pollId: pollId });
+      if (participant.userId) {
+        scheduleCalendarHoldSync({ pollId, userId: participant.userId });
+      }
     });
   } catch (error) {
     return refusal(error);
@@ -399,6 +404,7 @@ export async function deleteParticipant({
         where: { id: participantId, pollId },
         select: {
           name: true,
+          userId: true,
           votes: {
             select: {
               optionId: true,
@@ -437,6 +443,9 @@ export async function deleteParticipant({
         },
       ]);
       scheduleWebhookDispatch({ pollId: pollId });
+      if (snapshot.userId) {
+        scheduleCalendarHoldSync({ pollId, userId: snapshot.userId });
+      }
     });
   } catch (error) {
     return refusal(error);

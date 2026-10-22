@@ -371,8 +371,48 @@ export async function connectCalDavCalendar({
   });
 
   await syncCalendars({ userId, connectionId: connection.id });
+  await ensureDefaultDestinationCalendar({
+    userId,
+    connectionId: connection.id,
+  });
 
   return { ok: true, connectionId: connection.id };
+}
+
+/**
+ * Picks a calendar for new entries when the user has none yet: the
+ * account's primary calendar if it can be written to, else the first one
+ * that can.
+ */
+export async function ensureDefaultDestinationCalendar({
+  userId,
+  connectionId,
+}: {
+  userId: string;
+  connectionId: string;
+}) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { defaultDestinationCalendarId: true },
+  });
+  if (!user || user.defaultDestinationCalendarId) return;
+
+  const calendar = await prisma.providerCalendar.findFirst({
+    where: {
+      calendarConnectionId: connectionId,
+      calendarConnection: { userId },
+      isWritable: true,
+      isDeleted: false,
+    },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+  if (!calendar) return;
+
+  await prisma.user.updateMany({
+    where: { id: userId, defaultDestinationCalendarId: null },
+    data: { defaultDestinationCalendarId: calendar.id },
+  });
 }
 
 export async function updateCalendarPreferences({

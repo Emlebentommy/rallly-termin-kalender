@@ -424,8 +424,13 @@ export function computeOptionAvailability({
       )
       .map(({ event }) => event);
 
-    const busy = conflicts.some((event) => event.busy && !event.hold);
-    const held = conflicts.some((event) => event.busy && event.hold);
+    // A booked date of another poll is as real as any other event
+    const busy = conflicts.some(
+      (event) => event.busy && event.hold?.kind !== "tentative",
+    );
+    const held = conflicts.some(
+      (event) => event.busy && event.hold?.kind === "tentative",
+    );
     const status = busy ? "busy" : held ? "held" : "free";
     const tentative: SuggestedVote = allowTentativeVotes ? "ifNeedBe" : "no";
 

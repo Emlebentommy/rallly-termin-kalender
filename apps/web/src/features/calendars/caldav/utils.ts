@@ -146,6 +146,19 @@ export function resolveHref(href: string, base: URL | string) {
   return new URL(href, base).toString();
 }
 
+/**
+ * The object a PUT collided with, from the error body of a refused write
+ * whose UID is already in the calendar (the `no-uid-conflict` precondition).
+ */
+export function uidConflictHref(body: string) {
+  if (!/no-uid-conflict/.test(body)) return undefined;
+  const error = parser.parse(body) as Record<string, unknown>;
+  const conflict = (error.error as Record<string, unknown> | undefined)?.[
+    "no-uid-conflict"
+  ] as { href?: unknown } | undefined;
+  return firstText(conflict?.href);
+}
+
 /** A collection URL with exactly one trailing slash. */
 export function asCollectionUrl(url: string) {
   return url.endsWith("/") ? url : `${url}/`;
@@ -204,6 +217,25 @@ export function calendarQueryBody(range: { start: Date; end: Date }) {
     <c:comp-filter name="VCALENDAR">
       <c:comp-filter name="VEVENT">
         <c:time-range start="${escapeXml(formatUtc(range.start))}" end="${escapeXml(formatUtc(range.end))}"/>
+      </c:comp-filter>
+    </c:comp-filter>
+  </c:filter>
+</c:calendar-query>`;
+}
+
+/** Finds the object carrying a UID, whatever its name. */
+export function uidQueryBody(uid: string) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop>
+    <d:getetag/>
+  </d:prop>
+  <c:filter>
+    <c:comp-filter name="VCALENDAR">
+      <c:comp-filter name="VEVENT">
+        <c:prop-filter name="UID">
+          <c:text-match collation="i;octet">${escapeXml(uid)}</c:text-match>
+        </c:prop-filter>
       </c:comp-filter>
     </c:comp-filter>
   </c:filter>

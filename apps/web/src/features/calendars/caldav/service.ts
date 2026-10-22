@@ -1,6 +1,8 @@
 import "server-only";
 
-import { isIP } from "node:net";
+import type { LookupAddress, LookupOptions } from "node:dns";
+import { lookup } from "node:dns";
+import { BlockList, isIP } from "node:net";
 import type { Dispatcher } from "undici";
 import { getGlobalDispatcher } from "undici";
 import type {
@@ -16,8 +18,6 @@ import {
 } from "@/features/calendars/utils";
 import type { CalDavCredentials } from "@/features/credentials/schema";
 import { caldavCredentialsSchema } from "@/features/credentials/schema";
-import { guardedLookup } from "@/features/webhook/service";
-import { isPrivateAddress } from "@/features/webhook/utils";
 import { createOutboundDispatcher } from "@/lib/outbound-proxy";
 import {
   asCollectionUrl,
@@ -34,6 +34,8 @@ import {
   resolveHref,
   supportsEvents,
   textProp,
+  uidConflictHref,
+  uidQueryBody,
 } from "./utils";
 
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -66,6 +68,80 @@ export class CalDavError extends Error {
 export const allowPrivateCalDavTargets = () =>
   process.env.CALDAV_ALLOW_PRIVATE_URLS === "true";
 
+// The IANA special-purpose ranges that are not globally reachable, as the
+// webhook sender refuses them. BlockList also matches IPv4-mapped IPv6.
+const privateRanges = new BlockList();
+for (const [network, prefix] of [
+  ["0.0.0.0", 8],
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10],
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16],
+  ["172.16.0.0", 12],
+  ["192.0.0.0", 24],
+  ["192.0.2.0", 24],
+  ["192.168.0.0", 16],
+  ["198.18.0.0", 15],
+  ["198.51.100.0", 24],
+  ["203.0.113.0", 24],
+  ["224.0.0.0", 3],
+] as const) {
+  privateRanges.addSubnet(network, prefix, "ipv4");
+}
+for (const [network, prefix] of [
+  ["::", 127],
+  ["fe80::", 10],
+  ["fc00::", 7],
+] as const) {
+  privateRanges.addSubnet(network, prefix, "ipv6");
+}
+
+export function isPrivateAddress(address: string) {
+  const family = isIP(address);
+  if (family === 0) return false;
+  return privateRanges.check(address, family === 4 ? "ipv4" : "ipv6");
+}
+
+class PrivateAddressError extends Error {
+  constructor() {
+    super("The server resolves to a private address");
+    this.name = "PrivateAddressError";
+  }
+}
+
+/**
+ * A connect lookup that refuses private addresses, installed on the socket
+ * so the address checked is the address connected to (no DNS rebinding
+ * window between a check and the connect).
+ */
+function guardedLookup(
+  hostname: string,
+  options: LookupOptions,
+  callback: (
+    err: NodeJS.ErrnoException | null,
+    address: string | LookupAddress[],
+    family?: number,
+  ) => void,
+) {
+  lookup(hostname, { ...options, all: true }, (err, addresses) => {
+    if (err) return callback(err, []);
+    if (addresses.some((entry) => isPrivateAddress(entry.address))) {
+      return callback(new PrivateAddressError(), []);
+    }
+    if (options.all) return callback(null, addresses);
+    const [first] = addresses;
+    if (!first) {
+      return callback(
+        Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), {
+          code: "ENOTFOUND",
+        }),
+        [],
+      );
+    }
+    callback(null, first.address, first.family);
+  });
+}
+
 let guardedDispatcher: Dispatcher | null = null;
 
 function getDispatcher() {
@@ -85,6 +161,8 @@ type DavRequest = {
   body?: string;
   contentType?: string;
   headers?: Record<string, string>;
+  /** Hands a 403 back instead of reading it as refused credentials */
+  allowForbidden?: boolean;
 };
 
 export type CalDavAccount = {
@@ -112,6 +190,7 @@ export class CalDavCalendarService implements CalendarService {
     body,
     contentType,
     headers,
+    allowForbidden,
   }: DavRequest) {
     let target = url;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -174,7 +253,10 @@ export class CalDavCalendarService implements CalendarService {
         continue;
       }
 
-      if (response.status === 401 || response.status === 403) {
+      if (
+        response.status === 401 ||
+        (response.status === 403 && !allowForbidden)
+      ) {
         throw new CalDavError(
           "unauthorized",
           "The server refused the credentials",
@@ -368,6 +450,18 @@ export class CalDavCalendarService implements CalendarService {
     });
   }
 
+  private async findObjectByUid(calendar: ProviderCalendarRef, uid: string) {
+    const { response, url } = await this.request({
+      method: "REPORT",
+      url: asCollectionUrl(calendar.providerCalendarId),
+      depth: "1",
+      body: uidQueryBody(uid),
+    });
+    if (response.status !== 207) return undefined;
+    const [match] = parseMultistatus(await response.text());
+    return match ? resolveHref(match.href, url) : undefined;
+  }
+
   private objectUrl(calendar: ProviderCalendarRef, uid: string) {
     // UIDs carry characters such as "@"; the file name only has to be stable
     const name = uid.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -385,6 +479,7 @@ export class CalDavCalendarService implements CalendarService {
       body,
       contentType: "text/calendar; charset=utf-8",
       headers,
+      allowForbidden: true,
     });
     return response;
   }
@@ -393,14 +488,36 @@ export class CalDavCalendarService implements CalendarService {
     calendar,
     event,
   }: Parameters<CalendarService["createEvent"]>[0]): Promise<WrittenEvent> {
-    const url = this.objectUrl(calendar, event.uid);
-    let response = await this.put(url, buildICalendar(event), {
-      "If-None-Match": "*",
-    });
+    let url = this.objectUrl(calendar, event.uid);
+    const body = buildICalendar(event);
+    let response = await this.put(url, body, { "If-None-Match": "*" });
+    // The UID is taken by another object: the booked date's invitation was
+    // already added to this calendar from the email. That entry is the one
+    // to keep, so it is adopted and brought in line (RFC 4791 5.3.2.1).
+    if (response.status === 403 || response.status === 409) {
+      const conflict = await response.text();
+      // Servers name the object in the error (Nextcloud) or leave it out
+      // (Radicale), when it is looked up by UID
+      const existing = /no-uid-conflict/.test(conflict)
+        ? (uidConflictHref(conflict) ??
+          (await this.findObjectByUid(calendar, event.uid)))
+        : undefined;
+      if (existing) {
+        url = resolveHref(existing, url);
+        response = await this.put(url, body, {});
+      }
+    }
     // An object of that name exists already (a write that failed half way):
     // it carries our UID, so it is ours to replace
     if (response.status === 412) {
-      response = await this.put(url, buildICalendar(event), {});
+      response = await this.put(url, body, {});
+    }
+    if (response.status === 403) {
+      throw new CalDavError(
+        "unauthorized",
+        "The server refused the write",
+        403,
+      );
     }
     if (!response.ok) {
       throw new CalDavError(
@@ -429,6 +546,13 @@ export class CalDavCalendarService implements CalendarService {
     }
     if (response.status === 404) {
       throw new CalDavError("not_found", "The entry no longer exists", 404);
+    }
+    if (response.status === 403) {
+      throw new CalDavError(
+        "unauthorized",
+        "The server refused the write",
+        403,
+      );
     }
     if (!response.ok) {
       throw new CalDavError(

@@ -1,6 +1,7 @@
 import { env } from "@/env";
 import {
   createCalendarConnection,
+  ensureDefaultDestinationCalendar,
   syncCalendars,
 } from "@/features/calendars/mutations";
 import {
@@ -112,6 +113,10 @@ const { handler } = OAuthIntegration<Integration>({
             });
 
             await syncCalendars({ userId, connectionId: connection.id });
+            await ensureDefaultDestinationCalendar({
+              userId,
+              connectionId: connection.id,
+            });
           },
         });
       }

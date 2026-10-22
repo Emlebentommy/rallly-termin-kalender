@@ -111,6 +111,13 @@ export const getHoldCalendar = async (userId: string) => {
   return calendar?.isWritable && !calendar.isDeleted ? calendar : null;
 };
 
+export const isOwnConnection = async (userId: string, connectionId: string) => {
+  const count = await prisma.calendarConnection.count({
+    where: { id: connectionId, userId },
+  });
+  return count > 0;
+};
+
 export const hasCalendarConnection = async (userId: string) => {
   const count = await prisma.calendarConnection.count({ where: { userId } });
   return count > 0;

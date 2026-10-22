@@ -5,6 +5,7 @@ import {
   authActionClient,
   createRateLimitMiddleware,
 } from "@/lib/safe-action/server";
+import { scheduleCalendarHoldSync } from "./holds/mutations";
 import { connectCalDavCalendar, updateCalendarPreferences } from "./mutations";
 import { calendarPreferencesSchema, connectCalDavSchema } from "./schema";
 
@@ -38,4 +39,5 @@ export const updateCalendarPreferencesAction = accountActionClient
   .inputSchema(calendarPreferencesSchema)
   .action(async ({ ctx, parsedInput }) => {
     await updateCalendarPreferences({ userId: ctx.user.id, ...parsedInput });
+    scheduleCalendarHoldSync({ userId: ctx.user.id });
   });

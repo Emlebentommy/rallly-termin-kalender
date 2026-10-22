@@ -3,7 +3,12 @@ import {
   getCalendarPreferences,
   getCalendars,
   getDefaultCalendar,
+  isOwnConnection,
 } from "@/features/calendars/data";
+import {
+  removeConnectionHolds,
+  scheduleCalendarHoldSync,
+} from "@/features/calendars/holds/mutations";
 import {
   disconnectCalendarConnection,
   setCalendarSelection,
@@ -34,7 +39,13 @@ export const calendars = router({
   disconnect: privateProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      return disconnectCalendarConnection(ctx.user.id, input.id);
+      // The entries go first, while the connection can still reach them
+      if (await isOwnConnection(ctx.user.id, input.id)) {
+        await removeConnectionHolds(input.id);
+      }
+      const result = await disconnectCalendarConnection(ctx.user.id, input.id);
+      scheduleCalendarHoldSync({ userId: ctx.user.id });
+      return result;
     }),
   sync: privateProcedure
     .input(z.object({ id: z.string() }))
@@ -47,10 +58,13 @@ export const calendars = router({
   setDefault: privateProcedure
     .input(z.object({ calendarId: z.string().nullable() }))
     .mutation(async ({ ctx, input }) => {
-      return setDefaultCalendar({
+      const result = await setDefaultCalendar({
         userId: ctx.user.id,
         calendarId: input.calendarId,
       });
+      // Entries move to the new calendar
+      scheduleCalendarHoldSync({ userId: ctx.user.id });
+      return result;
     }),
   setSelection: privateProcedure
     .input(
