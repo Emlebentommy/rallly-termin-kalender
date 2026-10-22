@@ -49,6 +49,10 @@ const IGNORED_RELATIONS = new Map([
     "Per-user settings, meaningless once the account is gone.",
   ],
   [
+    "calendarPreferences",
+    "Per-user calendar settings, meaningless once the account is gone.",
+  ],
+  [
     "queuedEmails",
     "Delivery state for emails the account's actions queued, sent within minutes and carrying no user-authored content. Once the account is gone, what it queued should not go out.",
   ],

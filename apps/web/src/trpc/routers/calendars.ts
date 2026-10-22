@@ -1,17 +1,36 @@
 import * as z from "zod";
-import { getCalendars, getDefaultCalendar } from "@/features/calendars/data";
+import {
+  getCalendarPreferences,
+  getCalendars,
+  getDefaultCalendar,
+} from "@/features/calendars/data";
 import {
   disconnectCalendarConnection,
   setCalendarSelection,
   setDefaultCalendar,
   syncCalendars,
 } from "@/features/calendars/mutations";
+import { pollAvailabilitySchema } from "@/features/calendars/schema";
+import { getPollAvailability } from "@/features/calendars/service";
 import { privateProcedure, router } from "../trpc";
 
 export const calendars = router({
   list: privateProcedure.query(async ({ ctx }) => {
     return getCalendars(ctx.user.id);
   }),
+  preferences: privateProcedure.query(async ({ ctx }) => {
+    return getCalendarPreferences(ctx.user.id);
+  }),
+  /**
+   * The signed-in user's calendar around a poll's dates. Only ever the
+   * caller's own calendar, so no poll permission is involved beyond knowing
+   * its id.
+   */
+  pollAvailability: privateProcedure
+    .input(pollAvailabilitySchema)
+    .query(async ({ ctx, input }) => {
+      return getPollAvailability({ userId: ctx.user.id, ...input });
+    }),
   disconnect: privateProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
