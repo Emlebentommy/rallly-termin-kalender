@@ -1,6 +1,9 @@
 "use client";
 
+import { Alert, AlertDescription } from "@rallly/ui/alert";
+import { Badge } from "@rallly/ui/badge";
 import { Button } from "@rallly/ui/button";
+import { useDialog } from "@rallly/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +13,12 @@ import {
 import { toast } from "@rallly/ui/sonner";
 import { Switch } from "@rallly/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@rallly/ui/tooltip";
-import { CalendarIcon, MoreVerticalIcon, RefreshCcwIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CalendarIcon,
+  MoreVerticalIcon,
+  RefreshCcwIcon,
+} from "lucide-react";
 import {
   EmptyState,
   EmptyStateDescription,
@@ -18,12 +26,16 @@ import {
   EmptyStateTitle,
 } from "@/components/empty-state";
 import { Spinner } from "@/components/spinner";
+import { connectToCalendar } from "@/features/calendars/client";
+import { CalDavConnectDialog } from "@/features/calendars/components/caldav-connect-dialog";
 import { CalendarProviderIcon } from "@/features/calendars/components/calendar-provider-icon";
 import { Trans, useTranslation } from "@/i18n/client";
 import { trpc } from "@/trpc/client";
 
 export function CalendarConnectionList() {
   const { data: connections } = trpc.calendars.list.useQuery();
+  const { data: defaultCalendar } = trpc.calendars.getDefault.useQuery();
+  const reconnectDialog = useDialog();
   const disconnectCalendar = trpc.calendars.disconnect.useMutation();
   const syncCalendar = trpc.calendars.sync.useMutation();
   const { t } = useTranslation();
@@ -44,8 +56,8 @@ export function CalendarConnectionList() {
         </EmptyStateTitle>
         <EmptyStateDescription>
           <Trans
-            i18nKey="noCalendarsDescription"
-            defaults="No calendars found"
+            i18nKey="calendarsEmptyDescription"
+            defaults="Connect a calendar to see clashes while you answer polls and to hold the dates you say yes to."
           />
         </EmptyStateDescription>
       </EmptyState>
@@ -54,6 +66,10 @@ export function CalendarConnectionList() {
 
   return (
     <div className="space-y-4">
+      <CalDavConnectDialog
+        {...reconnectDialog.dialogProps}
+        defaultPreset="other"
+      />
       {connections.map((calendar) => (
         <div className="space-y-4 rounded-xl border p-4" key={calendar.id}>
           <div className="flex items-center gap-x-4">
@@ -146,6 +162,38 @@ export function CalendarConnectionList() {
               </DropdownMenu>
             </div>
           </div>
+          {calendar.errorMessage ? (
+            <Alert variant="warning">
+              <AlertTriangleIcon />
+              <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {calendar.errorMessage === "unauthorized" ? (
+                    <Trans
+                      i18nKey="calendarConnectionUnauthorized"
+                      defaults="The calendar no longer accepts the login. Connect it again to keep conflicts and entries up to date."
+                    />
+                  ) : (
+                    <Trans
+                      i18nKey="calendarConnectionFailing"
+                      defaults="The calendar could not be reached the last time we tried."
+                    />
+                  )}
+                </span>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (calendar.provider === "caldav") {
+                      reconnectDialog.trigger();
+                    } else {
+                      connectToCalendar(calendar.integrationId);
+                    }
+                  }}
+                >
+                  <Trans i18nKey="reconnectCalendar" defaults="Reconnect" />
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <hr />
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
@@ -182,6 +230,14 @@ export function CalendarConnectionList() {
                       }}
                     />
                     <span className="text-sm">{c.name}</span>
+                    {defaultCalendar?.defaultDestinationCalendarId === c.id ? (
+                      <Badge variant="secondary">
+                        <Trans
+                          i18nKey="calendarEntriesGoHere"
+                          defaults="New entries"
+                        />
+                      </Badge>
+                    ) : null}
                   </li>
                 );
               })}
