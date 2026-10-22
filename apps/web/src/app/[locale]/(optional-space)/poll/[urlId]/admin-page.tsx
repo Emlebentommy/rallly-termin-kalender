@@ -4,6 +4,7 @@ import { usePoll } from "@/features/poll/client";
 import { CommentsSheet } from "@/features/poll/components/comments-sheet";
 import { EventCard } from "@/features/poll/components/event-card";
 import { EventMetaDescription } from "@/features/poll/components/event-meta-description";
+import { PollCalendarPanel } from "@/features/poll/components/poll-calendar/poll-calendar-panel";
 import { PollFooter } from "@/features/poll/components/poll-footer";
 import { ResponsiveResults } from "@/features/poll/components/responsive-results";
 import { VotingForm } from "@/features/poll/components/voting-form";
@@ -37,6 +38,7 @@ export function AdminPage({
         }
       />
       <VotingForm>
+        <PollCalendarPanel />
         <ResponsiveResults />
       </VotingForm>
       <div className="fixed right-4 bottom-15 z-40 lg:right-6 lg:bottom-6">

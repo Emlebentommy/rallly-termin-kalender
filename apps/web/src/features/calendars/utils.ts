@@ -472,3 +472,66 @@ export function getAvailabilityRange(
   );
   return { start, end };
 }
+
+export type AvailabilityDay = {
+  /** The day in the user's zone, YYYY-MM-DD */
+  date: string;
+  events: AvailabilityEvent[];
+};
+
+/**
+ * The user's events on each day the poll has an option, for an agenda
+ * beside the options. Days are the user's local days.
+ */
+export function getAvailabilityDays({
+  options,
+  events,
+  pollTimeZone,
+  userTimeZone,
+  maxDays = 62,
+}: {
+  options: { startTime: Date; duration: number }[];
+  events: AvailabilityEvent[];
+  pollTimeZone: string | null;
+  userTimeZone: string;
+  maxDays?: number;
+}): AvailabilityDay[] {
+  const dates = new Set<string>();
+  for (const option of options) {
+    const times = getOptionTimes({
+      startTime: option.startTime,
+      duration: option.duration,
+      pollTimeZone,
+      userTimeZone,
+    });
+    dates.add(
+      times.allDay
+        ? toISODate(times.entryStart)
+        : getCalendarDate(times.start, userTimeZone),
+    );
+  }
+
+  const spans = events.map((event) => ({
+    event,
+    span: getEventSpan(event, userTimeZone),
+  }));
+
+  return Array.from(dates)
+    .sort()
+    .slice(0, maxDays)
+    .map((date) => {
+      const next = toISODate(
+        new Date(calendarDateToUTCMidnight(date).getTime() + DAY_MS),
+      );
+      const day = {
+        start: wallTimeToInstant(date, userTimeZone),
+        end: wallTimeToInstant(next, userTimeZone),
+      };
+      return {
+        date,
+        events: spans
+          .filter(({ span }) => rangesOverlap(span, day))
+          .map(({ event }) => event),
+      };
+    });
+}

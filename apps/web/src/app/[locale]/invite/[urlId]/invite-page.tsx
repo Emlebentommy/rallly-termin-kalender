@@ -4,6 +4,7 @@ import { ArrowUpRightIcon, EyeIcon } from "lucide-react";
 import { Link } from "@/components/link";
 import { Spinner } from "@/components/spinner";
 import { EventCard } from "@/features/poll/components/event-card";
+import { PollCalendarPanel } from "@/features/poll/components/poll-calendar/poll-calendar-panel";
 import { PollFooter } from "@/features/poll/components/poll-footer";
 import { PollPageShell } from "@/features/poll/components/poll-page-shell";
 import { ResponsiveResults } from "@/features/poll/components/responsive-results";
@@ -47,6 +48,7 @@ export function InvitePage({
     <>
       <EventCard description={description} />
       <VotingForm>
+        <PollCalendarPanel />
         <ResponsiveResults />
         <FloatingComments />
       </VotingForm>

@@ -5,6 +5,7 @@ import {
   computeOptionAvailability,
   escapeICalText,
   foldICalLine,
+  getAvailabilityDays,
   getAvailabilityRange,
   getEventSpan,
   getOptionTimes,
@@ -566,5 +567,54 @@ describe("getAvailabilityRange", () => {
     expect(range?.start).toEqual(new Date("2026-11-03T17:00:00Z"));
     expect(range?.end).toEqual(new Date("2026-12-03T17:00:00Z"));
     expect(getAvailabilityRange([], 30)).toBeNull();
+  });
+});
+
+describe("getAvailabilityDays", () => {
+  const event = (
+    title: string,
+    start: string,
+    end: string,
+    allDay = false,
+  ): AvailabilityEvent => ({
+    title,
+    start: new Date(start),
+    end: new Date(end),
+    allDay,
+    busy: true,
+    calendarName: "Privat",
+    hold: null,
+  });
+
+  it("lists the user's events on each local day the poll has an option", () => {
+    const days = getAvailabilityDays({
+      options: [
+        // 23:30 in Berlin on 3 March, which is 4 March in UTC terms the next hour
+        { startTime: new Date("2030-03-03T22:30:00Z"), duration: 60 },
+        { startTime: new Date("2030-03-05T09:00:00Z"), duration: 60 },
+        { startTime: new Date("2030-03-05T15:00:00Z"), duration: 60 },
+      ],
+      events: [
+        event("Abendtermin", "2030-03-03T18:00:00Z", "2030-03-03T19:00:00Z"),
+        event("Urlaub", "2030-03-05T00:00:00Z", "2030-03-06T00:00:00Z", true),
+        event("Anderer Tag", "2030-03-04T10:00:00Z", "2030-03-04T11:00:00Z"),
+      ],
+      pollTimeZone: "Europe/Berlin",
+      userTimeZone: "Europe/Berlin",
+    });
+
+    expect(days.map((day) => day.date)).toEqual(["2030-03-03", "2030-03-05"]);
+    expect(days[0]?.events.map((e) => e.title)).toEqual(["Abendtermin"]);
+    expect(days[1]?.events.map((e) => e.title)).toEqual(["Urlaub"]);
+  });
+
+  it("uses the option's own date for all-day options", () => {
+    const days = getAvailabilityDays({
+      options: [{ startTime: new Date("2030-04-10T00:00:00Z"), duration: 0 }],
+      events: [],
+      pollTimeZone: null,
+      userTimeZone: "America/New_York",
+    });
+    expect(days).toEqual([{ date: "2030-04-10", events: [] }]);
   });
 });

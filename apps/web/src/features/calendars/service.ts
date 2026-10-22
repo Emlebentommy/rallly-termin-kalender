@@ -13,14 +13,16 @@ import { AVAILABILITY_MAX_RANGE_DAYS } from "./constants";
 import {
   getCalendarPreferences,
   getConflictCalendars,
+  getHoldCalendar,
   getPollOptionsForCalendar,
   getUserCalendarHolds,
   getUserTimeZone,
 } from "./data";
 import { clearConnectionError, recordConnectionError } from "./mutations";
-import type { AvailabilityEvent, OptionAvailability } from "./utils";
+import type { AvailabilityDay, OptionAvailability } from "./utils";
 import {
   computeOptionAvailability,
+  getAvailabilityDays,
   getAvailabilityRange,
   getOptionTimes,
   tagHolds,
@@ -148,9 +150,11 @@ export type PollAvailability = {
   failed: { connectionId: string; displayName: string | null }[];
   timeZone: string;
   preferences: Awaited<ReturnType<typeof getCalendarPreferences>>;
+  /** The calendar answers are held in, when one is set */
+  holdCalendarName: string | null;
   options: OptionAvailability[];
-  /** Everything in the calendars over the poll's dates, for the agenda */
-  events: AvailabilityEvent[];
+  /** The calendars on each day of the poll, for the agenda */
+  days: AvailabilityDay[];
 };
 
 /** What a user's calendars say about the options of a poll. */
@@ -163,10 +167,11 @@ export async function getPollAvailability({
   pollId: string;
   timeZone?: string;
 }): Promise<PollAvailability | null> {
-  const [poll, preferences, storedTimeZone] = await Promise.all([
+  const [poll, preferences, storedTimeZone, holdCalendar] = await Promise.all([
     getPollOptionsForCalendar(pollId),
     getCalendarPreferences(userId),
     getUserTimeZone(userId),
+    getHoldCalendar(userId),
   ]);
   if (!poll) return null;
 
@@ -188,8 +193,9 @@ export async function getPollAvailability({
   const empty = {
     timeZone: userTimeZone,
     preferences,
+    holdCalendarName: holdCalendar?.name ?? null,
     options: [],
-    events: [],
+    days: [],
   };
   if (!range) {
     return { ...empty, connected: false, failed: [] };
@@ -212,7 +218,13 @@ export async function getPollAvailability({
     failed: read.failed,
     timeZone: userTimeZone,
     preferences,
-    events,
+    holdCalendarName: holdCalendar?.name ?? null,
+    days: getAvailabilityDays({
+      options: poll.options,
+      events,
+      pollTimeZone: poll.timeZone,
+      userTimeZone,
+    }),
     options: computeOptionAvailability({
       options: poll.options,
       events,
