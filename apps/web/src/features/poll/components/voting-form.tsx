@@ -16,6 +16,7 @@ import {
   useUpdateParticipantVotes,
 } from "@/features/poll/components/mutations";
 import { NewParticipantForm } from "@/features/poll/components/new-participant-modal";
+import { PollCalendarProvider } from "@/features/poll/components/poll-calendar/poll-calendar-context";
 import { useTranslation } from "@/i18n/client";
 
 const formSchema = z.object({
@@ -170,7 +171,7 @@ export const VotingForm = ({ children }: React.PropsWithChildren) => {
           />
         </DialogContent>
       </Dialog>
-      {children}
+      <PollCalendarProvider>{children}</PollCalendarProvider>
     </FormProvider>
   );
 };

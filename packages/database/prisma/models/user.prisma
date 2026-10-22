@@ -88,6 +88,8 @@ model User {
 
   calendarConnections     CalendarConnection[]
   conferencingConnections ConferencingConnection[]
+  calendarHolds           CalendarHold[]
+  calendarPreferences     CalendarPreferences?
   credentials             Credential[]
 
   // Default destination calendar for new events

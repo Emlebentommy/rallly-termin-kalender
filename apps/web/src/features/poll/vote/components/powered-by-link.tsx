@@ -1,8 +1,7 @@
 "use client";
 import { posthog } from "@rallly/posthog/client";
 import { Link } from "@/components/link";
-import LogoWordmark from "@/features/branding/assets/logo.svg";
-import { DEFAULT_APP_NAME } from "@/features/branding/constants";
+import LogoWordmark from "@/features/branding/assets/rallly-wordmark.svg";
 import { Trans } from "@/i18n/client";
 
 /** The attribution pill. Client only because the click is tracked. */
@@ -30,7 +29,7 @@ export function PoweredByLink({
     >
       <Trans i18nKey="poweredBy" defaults="Powered by" />
       <LogoWordmark aria-hidden="true" className="h-3.5 w-auto" />
-      <span className="sr-only"> {DEFAULT_APP_NAME}</span>
+      <span className="sr-only"> Rallly</span>
     </Link>
   );
 }

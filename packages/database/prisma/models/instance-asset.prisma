@@ -1,0 +1,12 @@
+// Files the instance admin uploads in the design settings (logos and fonts).
+// Kept in the database so the design works without object storage; each file
+// is small and served with a long cache lifetime behind a version parameter.
+model InstanceAsset {
+  key       String   @id
+  mimeType  String   @map("mime_type")
+  fileName  String?  @map("file_name")
+  data      Bytes
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("instance_assets")
+}

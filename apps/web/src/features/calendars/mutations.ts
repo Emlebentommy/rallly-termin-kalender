@@ -1,9 +1,17 @@
 import "server-only";
 
 import { prisma } from "@rallly/database";
-import { loadCredential } from "@/features/credentials/data";
+import { createLogger } from "@rallly/logger";
+import {
+  CalDavCalendarService,
+  CalDavError,
+} from "@/features/calendars/caldav/service";
+import { saveCalDavCredentials } from "@/features/credentials/mutations";
 import type { UserInfo } from "@/lib/oauth/types";
-import { createCalendarService } from "./service";
+import { createConnectionService } from "./service";
+import type { CalendarInfo } from "./types";
+
+const logger = createLogger("calendars");
 
 export const createCalendarConnection = async (params: {
   userId: string;
@@ -103,21 +111,23 @@ export const syncCalendars = async ({
     };
   }
 
-  const credential = await loadCredential(connection.credentialId);
+  const calendarService = await createConnectionService(connection);
 
-  if (!credential) {
+  if (!calendarService) {
     return {
       success: false,
       error: "Credential not found" as const,
     };
   }
 
-  const calendarService = await createCalendarService({
-    provider: connection.provider,
-    credentials: credential.secret,
-  });
-
-  const calendars = await calendarService.listCalendars();
+  let calendars: CalendarInfo[];
+  try {
+    calendars = await calendarService.listCalendars();
+  } catch (error) {
+    await recordConnectionError(connection.id, error);
+    return { success: false, error: "Provider request failed" as const };
+  }
+  await clearConnectionError(connection.id);
 
   await prisma.$transaction(async (tx) => {
     // Get current calendar IDs from the provider response
@@ -256,3 +266,168 @@ export const setDefaultCalendar = async ({
 
   return { success: true };
 };
+
+/**
+ * Remembers that a provider call failed, so the settings page can say the
+ * connection needs attention (an expired app password, a revoked grant)
+ * instead of conflicts and entries silently going missing.
+ */
+export async function recordConnectionError(
+  connectionId: string,
+  error: unknown,
+) {
+  const reason = (error as { reason?: unknown })?.reason;
+  const message =
+    reason === "unauthorized"
+      ? "unauthorized"
+      : error instanceof Error
+        ? error.message.slice(0, 300)
+        : "error";
+  logger.warn(
+    { connectionId, reason, message },
+    "Calendar provider request failed",
+  );
+  await prisma.calendarConnection.updateMany({
+    where: { id: connectionId },
+    data: { errorMessage: message, errorAt: new Date() },
+  });
+}
+
+export async function clearConnectionError(connectionId: string) {
+  await prisma.calendarConnection.updateMany({
+    where: { id: connectionId, errorMessage: { not: null } },
+    data: { errorMessage: null, errorAt: null },
+  });
+}
+
+export type ConnectCalDavResult =
+  | { ok: true; connectionId: string }
+  | { ok: false; reason: CalDavError["reason"] };
+
+/**
+ * Connects a CalDAV account: discovers its calendars with the given
+ * credentials first, so nothing is stored for an account that does not work.
+ * Calendars that can hold events are checked for conflicts by default.
+ */
+export async function connectCalDavCalendar({
+  userId,
+  serverUrl,
+  username,
+  password,
+  displayName,
+}: {
+  userId: string;
+  serverUrl: string;
+  username: string;
+  password: string;
+  displayName?: string;
+}): Promise<ConnectCalDavResult> {
+  const credentials = { serverUrl, username, password };
+  let account: Awaited<ReturnType<CalDavCalendarService["discover"]>>;
+  try {
+    account = await new CalDavCalendarService({ credentials }).discover();
+  } catch (error) {
+    if (error instanceof CalDavError) {
+      return { ok: false, reason: error.reason };
+    }
+    throw error;
+  }
+
+  // The home URL names the account on its server; it stays stable when
+  // the user types the server address differently next time
+  const providerAccountId = account.homeUrl;
+  const host = new URL(account.homeUrl).host;
+
+  const credential = await saveCalDavCredentials({
+    userId,
+    providerAccountId,
+    credentials: { ...credentials, serverUrl: account.principalUrl },
+  });
+
+  const connection = await prisma.calendarConnection.upsert({
+    where: {
+      user_provider_account_unique: {
+        userId,
+        provider: "caldav",
+        providerAccountId,
+      },
+    },
+    create: {
+      userId,
+      provider: "caldav",
+      integrationId: "caldav",
+      providerAccountId,
+      credentialId: credential.id,
+      email: username,
+      displayName: displayName || account.displayName || host,
+    },
+    update: {
+      credentialId: credential.id,
+      email: username,
+      errorMessage: null,
+      errorAt: null,
+      ...(displayName ? { displayName } : {}),
+    },
+  });
+
+  await syncCalendars({ userId, connectionId: connection.id });
+  await ensureDefaultDestinationCalendar({
+    userId,
+    connectionId: connection.id,
+  });
+
+  return { ok: true, connectionId: connection.id };
+}
+
+/**
+ * Picks a calendar for new entries when the user has none yet: the
+ * account's primary calendar if it can be written to, else the first one
+ * that can.
+ */
+export async function ensureDefaultDestinationCalendar({
+  userId,
+  connectionId,
+}: {
+  userId: string;
+  connectionId: string;
+}) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { defaultDestinationCalendarId: true },
+  });
+  if (!user || user.defaultDestinationCalendarId) return;
+
+  const calendar = await prisma.providerCalendar.findFirst({
+    where: {
+      calendarConnectionId: connectionId,
+      calendarConnection: { userId },
+      isWritable: true,
+      isDeleted: false,
+    },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+  if (!calendar) return;
+
+  await prisma.user.updateMany({
+    where: { id: userId, defaultDestinationCalendarId: null },
+    data: { defaultDestinationCalendarId: calendar.id },
+  });
+}
+
+export async function updateCalendarPreferences({
+  userId,
+  ...data
+}: {
+  userId: string;
+  holdsEnabled?: boolean;
+  holdIfNeedBe?: boolean;
+  autoPrefill?: boolean;
+  busyVote?: "no" | "ifNeedBe";
+}) {
+  return await prisma.calendarPreferences.upsert({
+    where: { userId },
+    create: { userId, ...data },
+    update: data,
+  });
+}

@@ -13,6 +13,7 @@ import { scheduleQueuedEmailDelivery } from "@/emails/queue";
 import { recordPollActivities } from "@/features/activity/mutations";
 import { getPollChanges } from "@/features/activity/utils";
 import { resolveSpaceTier } from "@/features/billing/utils";
+import { scheduleCalendarHoldSync } from "@/features/calendars/holds/mutations";
 import {
   getConnectedConferencingProviders,
   parsePollConferencing,
@@ -815,6 +816,7 @@ export const polls = router({
             : []),
         ]);
         scheduleWebhookDispatch({ pollId: pollId });
+        scheduleCalendarHoldSync({ pollId });
       });
 
       // Get updated poll data for group update
@@ -963,6 +965,7 @@ export const polls = router({
           },
         ]);
         scheduleWebhookDispatch({ pollId: pollId });
+        scheduleCalendarHoldSync({ pollId });
       });
 
       // Track poll deletion analytics
@@ -1435,6 +1438,7 @@ export const polls = router({
           subjectIds: notifyInviteUids,
         });
         scheduleWebhookDispatch({ pollId: poll.id });
+        scheduleCalendarHoldSync({ pollId: poll.id });
 
         return event;
       });

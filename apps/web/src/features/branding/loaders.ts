@@ -2,64 +2,84 @@ import "server-only";
 
 import { cache } from "react";
 import { env } from "@/env";
-import { getInstanceSettings } from "@/features/instance-settings/data";
-import { loadInstanceLicense } from "@/features/licensing/data";
-import { DEFAULT_PRIMARY_COLOR } from "./constants";
+import {
+  getInstanceSettings,
+  listInstanceAssets,
+} from "@/features/instance-settings/data";
+import { getDesignAssetUrl } from "@/lib/storage/resolve-storage-url";
+import type { DesignAssetKey } from "./constants";
+import { designAssetKeys } from "./constants";
 import { getCustomBrandingConfig, getInstanceBrandingConfig } from "./data";
-import { getPrimaryColorVars } from "./utils";
+import type { DesignSettings } from "./schema";
+import { resolveThemeTokens } from "./utils";
 
 /** The instance's effective branding, for pages that render its identity. */
 export const loadInstanceBranding = cache(() => getInstanceBrandingConfig());
 
 /**
- * Raw branding values for the control panel branding page. Editable fields
- * expose the stored value (db, then env, then default) rather than the
- * contrast-adjusted output of `resolveBrandingConfig`, so inputs reflect
- * what will be saved. `envConfigured` marks fields that are driven by an
- * environment variable because no database value has been set yet.
+ * Values for the control panel design page. `values` holds what is stored:
+ * a null token means "use the preset", so the form can tell an override from
+ * an inherited value. `envDefaults` are the operator's environment settings,
+ * which apply where nothing is stored, and `resolved` is the effective theme.
  */
-export const loadBrandingSettings = cache(async () => {
-  const [license, db, resolved] = await Promise.all([
-    loadInstanceLicense(),
+export const loadDesignSettings = cache(async () => {
+  const [db, resolved, assetRows] = await Promise.all([
     getInstanceSettings(),
     getCustomBrandingConfig(),
+    listInstanceAssets(),
   ]);
 
-  const primaryColor =
-    db.primaryColor ?? env.PRIMARY_COLOR ?? DEFAULT_PRIMARY_COLOR;
-  const primaryColorDark =
-    db.primaryColorDark ??
-    env.PRIMARY_COLOR_DARK ??
-    getPrimaryColorVars(primaryColor).dark;
+  const values: DesignSettings = {
+    appName: db.appName ?? resolved.appName,
+    hideAttribution: db.hideAttribution ?? resolved.hideAttribution,
+    themePreset: resolveThemeTokens(db).preset,
+    primaryColor: db.primaryColor,
+    primaryColorDark: db.primaryColorDark,
+    accentColor: db.accentColor,
+    backgroundColor: db.backgroundColor,
+    backgroundColorDark: db.backgroundColorDark,
+    neutralTone: db.neutralTone as DesignSettings["neutralTone"],
+    fontBody: db.fontBody as DesignSettings["fontBody"],
+    fontHeading: db.fontHeading as DesignSettings["fontHeading"],
+    radius: db.radius as DesignSettings["radius"],
+    customCss: db.customCss,
+  };
+
+  const assets = Object.fromEntries(
+    designAssetKeys.map((key) => {
+      const row = assetRows.find((asset) => asset.key === key);
+      return [
+        key,
+        row
+          ? {
+              url: getDesignAssetUrl(key, row.updatedAt.getTime()),
+              fileName: row.fileName,
+              mimeType: row.mimeType,
+            }
+          : null,
+      ];
+    }),
+  ) as Record<
+    DesignAssetKey,
+    { url: string; fileName: string | null; mimeType: string } | null
+  >;
 
   return {
-    hasWhiteLabelAddon: license?.whiteLabelAddon ?? false,
-    appName: db.appName ?? env.APP_NAME,
-    primaryColor,
-    primaryColorDark,
-    hideAttribution: db.hideAttribution ?? env.HIDE_ATTRIBUTION === "true",
-    logoUrlLight: resolved.logo.light,
-    logoUrlDark: resolved.logo.dark,
-    logoIconUrl: resolved.logoIcon,
-    // A stored value exists that can be removed to fall back to env/default
-    logoConfigured: {
-      logo: db.logo !== null,
-      logoDark: db.logoDark !== null,
-      logoIcon: db.logoIcon !== null,
-    },
+    values,
     // Checked against process.env because the parsed env applies defaults
-    // (APP_NAME, HIDE_ATTRIBUTION), which would read as operator-set
-    envConfigured: {
-      appName: db.appName === null && Boolean(process.env.APP_NAME),
-      primaryColor:
-        db.primaryColor === null && Boolean(process.env.PRIMARY_COLOR),
-      primaryColorDark:
-        db.primaryColorDark === null && Boolean(process.env.PRIMARY_COLOR_DARK),
-      hideAttribution:
-        db.hideAttribution === null && Boolean(process.env.HIDE_ATTRIBUTION),
-      logo: db.logo === null && Boolean(process.env.LOGO_URL),
-      logoDark: db.logoDark === null && Boolean(process.env.LOGO_URL_DARK),
-      logoIcon: db.logoIcon === null && Boolean(process.env.LOGO_ICON_URL),
+    // (APP_NAME), which would read as operator-set
+    envDefaults: {
+      primaryColor: process.env.PRIMARY_COLOR ? env.PRIMARY_COLOR : undefined,
+      primaryColorDark: process.env.PRIMARY_COLOR_DARK
+        ? env.PRIMARY_COLOR_DARK
+        : undefined,
     },
+    resolved: {
+      primaryColor: resolved.primaryColor,
+      tokens: resolved.theme.tokens,
+      logo: resolved.logo,
+      logoIcon: resolved.logoIcon,
+    },
+    assets,
   };
 });

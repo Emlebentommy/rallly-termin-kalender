@@ -4,6 +4,7 @@ import { Prisma, prisma } from "@rallly/database";
 import { nanoid } from "@rallly/utils/nanoid";
 import { revalidatePath } from "next/cache";
 import { recordPollActivities } from "@/features/activity/mutations";
+import { scheduleCalendarHoldSync } from "@/features/calendars/holds/mutations";
 import { parsePollConferencing } from "@/features/conferencing/data";
 import type { PollConferencing } from "@/features/conferencing/schema";
 import {
@@ -257,6 +258,7 @@ export const deletePoll = async (
       { pollId, type: "poll_deleted", userId: null, payload: {} },
     ]);
     scheduleWebhookDispatch({ pollId: pollId });
+    scheduleCalendarHoldSync({ pollId });
 
     return { id: pollId };
   });

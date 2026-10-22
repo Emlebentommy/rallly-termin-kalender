@@ -4,9 +4,8 @@ import { cn } from "@rallly/ui";
 import type React from "react";
 import { InstanceFooterLinks } from "@/components/instance-footer-links";
 import { Link } from "@/components/link";
-import LogoWordmark from "@/features/branding/assets/logo.svg";
+import LogoWordmark from "@/features/branding/assets/rallly-wordmark.svg";
 import { useBranding } from "@/features/branding/client";
-import { DEFAULT_APP_NAME } from "@/features/branding/constants";
 import { usePoll } from "@/features/poll/client";
 import { Trans } from "@/i18n/client";
 
@@ -81,7 +80,7 @@ function PoweredByLink({ className }: { className: string }) {
     >
       <Trans i18nKey="poweredBy" defaults="Powered by" />
       <LogoWordmark aria-hidden="true" className="h-3.5 w-auto" />
-      <span className="sr-only"> {DEFAULT_APP_NAME}</span>
+      <span className="sr-only"> Rallly</span>
     </Link>
   );
 }

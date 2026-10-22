@@ -1,18 +1,11 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import {
-  BarChart2Icon,
-  CalendarDaysIcon,
-  CalendarIcon,
-  HomeIcon,
-  UsersIcon,
-} from "lucide-react";
+import { BarChart2Icon, CalendarIcon, HomeIcon, UsersIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import React from "react";
 import { useSpace } from "@/features/space/client";
 import { useTranslation } from "@/i18n/client";
-import { useFeatureFlag } from "@/lib/feature-flags/client";
 
 export interface NavigationItem {
   id: string;
@@ -38,7 +31,6 @@ export interface NavigationConfig {
 export const useSpaceMenu = () => {
   const { t } = useTranslation();
   const pathname = usePathname();
-  const isCalendarsEnabled = useFeatureFlag("calendars");
   const { data: space } = useSpace();
   // The members page is a management surface (inviting, roles, the
   // collaboration setting); members meet the roster through in-context
@@ -71,17 +63,6 @@ export const useSpaceMenu = () => {
               icon: CalendarIcon,
               isActive: pathname === "/events",
             },
-            ...(isCalendarsEnabled
-              ? [
-                  {
-                    id: "calendar",
-                    label: t("calendar", { defaultValue: "Calendar" }),
-                    href: "/calendar",
-                    icon: CalendarDaysIcon,
-                    isActive: pathname === "/calendar",
-                  },
-                ]
-              : []),
             ...(isAdmin
               ? [
                   {
@@ -97,7 +78,7 @@ export const useSpaceMenu = () => {
         },
       ],
     }),
-    [pathname, t, isCalendarsEnabled, isAdmin],
+    [pathname, t, isAdmin],
   );
 
   return React.useMemo(

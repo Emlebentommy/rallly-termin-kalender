@@ -12,6 +12,7 @@ import {
 } from "@rallly/ui/dialog";
 import * as m from "motion/react-m";
 import type * as React from "react";
+import { OptionCalendarStatus } from "@/features/poll/components/poll-calendar/option-calendar-status";
 import { IfScoresVisible } from "@/features/poll/components/visibility";
 import { PollOptionVoteSummary } from "@/features/poll/components/vote-breakdown-dialog";
 import { Trans, useTranslation } from "@/i18n/client";
@@ -69,7 +70,10 @@ const PollOption: React.FunctionComponent<PollOptionProps> = ({
       >
         {showVote ? <VoteIcon type={vote} /> : null}
       </span>
-      {children}
+      <div className="flex min-w-0 items-center gap-2">
+        {children}
+        <OptionCalendarStatus optionId={optionId} />
+      </div>
       <IfScoresVisible>
         <Button
           {...dialog.triggerProps}

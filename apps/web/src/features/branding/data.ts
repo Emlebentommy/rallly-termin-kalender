@@ -3,9 +3,8 @@ import "server-only";
 import { cache } from "react";
 import { env } from "@/env";
 import { getInstanceSettings } from "@/features/instance-settings/data";
-import { loadInstanceLicense } from "@/features/licensing/data";
-import { isSelfHosted } from "@/lib/constants";
 import { isMaintenanceModeEnabled } from "@/lib/maintenance";
+import { getDesignAssetUrl } from "@/lib/storage/resolve-storage-url";
 import { resolveBrandingConfig } from "./utils";
 
 function getDefaultBrandingConfig() {
@@ -14,7 +13,9 @@ function getDefaultBrandingConfig() {
 
 function getEnvBrandingValues() {
   return {
-    appName: env.APP_NAME,
+    // The env schema defaults APP_NAME to "Rallly"; only an operator-set
+    // value may override the instance default
+    appName: process.env.APP_NAME ? env.APP_NAME : undefined,
     primaryColor: env.PRIMARY_COLOR,
     primaryColorDark: env.PRIMARY_COLOR_DARK,
     logo: env.LOGO_URL,
@@ -25,33 +26,37 @@ function getEnvBrandingValues() {
 }
 
 export async function getCustomBrandingConfig() {
-  // Cloud keeps the env-only path; maintenance mode keeps skipping the
-  // database so the maintenance page can render while it's unreachable
-  const db =
-    isSelfHosted && !isMaintenanceModeEnabled()
-      ? await getInstanceSettings()
+  // The fork is self-hosted only, so the stored design applies in every
+  // mode; maintenance mode keeps skipping the database so the maintenance
+  // page can render while it's unreachable
+  const db = isMaintenanceModeEnabled() ? null : await getInstanceSettings();
+
+  const fontAsset = (
+    key: "fontBody" | "fontHeading",
+    asset: { mimeType: string; version: number } | null | undefined,
+  ) =>
+    asset
+      ? { url: getDesignAssetUrl(key, asset.version), mimeType: asset.mimeType }
       : null;
 
-  return resolveBrandingConfig({ db, env: getEnvBrandingValues() });
+  return resolveBrandingConfig({
+    db,
+    env: getEnvBrandingValues(),
+    assets: {
+      fontBody: fontAsset("fontBody", db?.fontAssets.fontBody),
+      fontHeading: fontAsset("fontHeading", db?.fontAssets.fontHeading),
+    },
+  });
 }
 
 /**
- * Returns the branding config for the current instance.
- * Automatically checks if the white label addon is enabled and returns
- * the appropriate config (custom or default).
+ * Returns the branding config for the current instance. This fork applies the
+ * instance's own design without the upstream white label license check.
  */
 export const getInstanceBrandingConfig = cache(async () => {
-  if (!isSelfHosted) {
-    return getCustomBrandingConfig();
-  }
   if (isMaintenanceModeEnabled()) {
-    // Skip the license lookup so the maintenance page can render while the
-    // database is unreachable
+    // The maintenance page must render while the database is unreachable
     return getDefaultBrandingConfig();
   }
-  const license = await loadInstanceLicense();
-  const hasWhiteLabelAddon = license?.whiteLabelAddon ?? false;
-  return hasWhiteLabelAddon
-    ? getCustomBrandingConfig()
-    : getDefaultBrandingConfig();
+  return getCustomBrandingConfig();
 });

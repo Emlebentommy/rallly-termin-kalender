@@ -166,6 +166,9 @@ jobs:
       # Point Playwright at the image's preinstalled browsers (HOME is /github/home in-container).
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
       CI: true
+      CALDAV_TEST_URL: http://127.0.0.1:5232
+      CALDAV_TEST_USER: ben
+      CALDAV_TEST_PASSWORD: geheim
     # Each shard gets its own database and mailbox, so the suite's
     # single-tenant assumptions hold within a shard.
     services:
@@ -202,6 +205,25 @@ jobs:
 
       - name: Setup database
         run: pnpm db:deploy
+
+      # CalDAV server for the calendar specs (tests/calendar-holds.spec.ts)
+      - name: Start Radicale
+        run: |
+          apt-get update -qq && apt-get install -y -qq python3-venv > /dev/null
+          python3 -m venv /tmp/radicale
+          /tmp/radicale/bin/pip install -q "radicale==3.8.3"
+          mkdir -p /tmp/radicale-data
+          printf 'ben:geheim\n' > /tmp/radicale-users
+          printf '[server]\nhosts = 127.0.0.1:5232\n[auth]\ntype = htpasswd\nhtpasswd_filename = /tmp/radicale-users\nhtpasswd_encryption = plain\n[storage]\nfilesystem_folder = /tmp/radicale-data\n[rights]\ntype = owner_only\n' > /tmp/radicale.conf
+          nohup /tmp/radicale/bin/radicale --config /tmp/radicale.conf > /tmp/radicale.log 2>&1 &
+          python3 -c "import time, urllib.request
+          for _ in range(30):
+              try:
+                  urllib.request.urlopen('http://127.0.0.1:5232/'); break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit(open('/tmp/radicale.log').read())"
 
       - name: Run tests
         # Run directly, not via turbo, so the job env reaches the test process.

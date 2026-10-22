@@ -2,6 +2,7 @@ import { subject } from "@casl/ability";
 import { prisma } from "@rallly/database";
 import { TRPCError } from "@trpc/server";
 import * as z from "zod";
+import { scheduleCalendarHoldSync } from "@/features/calendars/holds/mutations";
 import { sendScheduledEventCanceledEmails } from "@/features/scheduled-event/mutations";
 import { defineAbilityForMember } from "@/features/space/member/ability";
 import { router, spaceProcedure } from "../trpc";
@@ -49,6 +50,8 @@ export const events = router({
       if (count === 0) {
         return;
       }
+
+      scheduleCalendarHoldSync({ scheduledEventId: input.eventId });
 
       await sendScheduledEventCanceledEmails({
         eventId: input.eventId,

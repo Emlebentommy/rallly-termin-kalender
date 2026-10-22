@@ -497,6 +497,9 @@ importers:
       es-toolkit:
         specifier: ^1.39.9
         version: 1.44.0
+      fast-xml-parser:
+        specifier: ^5.7.3
+        version: 5.7.3
       hono:
         specifier: ^4.13.11
         version: 4.13.13
@@ -515,6 +518,9 @@ importers:
       i18next-resources-to-backend:
         specifier: ^1.2.1
         version: 1.2.1
+      ical.js:
+        specifier: ^2.2.1
+        version: 2.2.1
       ics:
         specifier: ^3.1.0
         version: 3.8.1
@@ -9144,6 +9150,9 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  ical.js@2.2.1:
+    resolution: {integrity: sha512-yK/UlPbEs316igb/tjRgbFA8ZV75rCsBJp/hWOatpyaPNlgw0dGDmU+FoicOcwX4xXkeXOkYiOmCqNPFpNPkQg==}
 
   ico-endec@0.1.6:
     resolution: {integrity: sha512-ZdLU38ZoED3g1j3iEyzcQj+wAkY2xfWNkymszfJPoxucIUhK7NayQ+/C4Kv0nDFMIsbtbEHldv3V8PU494/ueQ==}
@@ -22329,6 +22338,8 @@ snapshots:
   i18next@26.3.0(typescript@6.0.3):
     optionalDependencies:
       typescript: 6.0.3
+
+  ical.js@2.2.1: {}
 
   ico-endec@0.1.6: {}
 

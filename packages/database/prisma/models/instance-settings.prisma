@@ -10,16 +10,30 @@ model InstanceSettings {
   appName          String?  @map("app_name")
   primaryColor     String?  @map("primary_color")
   primaryColorDark String?  @map("primary_color_dark")
-  // Logo values are storage keys or absolute URLs
+  // Logo values are storage keys, absolute URLs or `asset:` references to an
+  // InstanceAsset row
   logo             String?
   logoDark         String?  @map("logo_dark")
   logoIcon         String?  @map("logo_icon")
   hideAttribution  Boolean? @map("hide_attribution")
 
+  // Design (unset values fall through to the theme preset). The preset picks
+  // the starting point; every other field overrides one token of it.
+  themePreset         String? @map("theme_preset")
+  accentColor         String? @map("accent_color")
+  backgroundColor     String? @map("background_color")
+  backgroundColorDark String? @map("background_color_dark")
+  // Tint of the neutral scale used for text, borders and surfaces
+  neutralTone         String? @map("neutral_tone")
+  fontBody            String? @map("font_body")
+  fontHeading         String? @map("font_heading")
+  radius              String?
+  customCss           String? @map("custom_css")
+
   // Ordered [{ label, href }] rendered in the login and invite page footers.
   // Not branding: this is how self-hosted instances satisfy local legal
   // disclosure requirements (Impressum, privacy policy), so it is not gated.
-  footerLinks      Json     @default("[]") @map("footer_links")
+  footerLinks Json @default("[]") @map("footer_links")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")

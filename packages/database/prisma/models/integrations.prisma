@@ -1,5 +1,7 @@
 enum CredentialType {
   OAUTH
+  /// Server URL, username and app password of a CalDAV account
+  CALDAV
 }
 
 model Credential {
@@ -26,13 +28,17 @@ model Credential {
 }
 
 model CalendarConnection {
-  id                String  @id @default(cuid())
-  userId            String  @map("user_id")
+  id                String    @id @default(cuid())
+  userId            String    @map("user_id")
   provider          String
-  integrationId     String  @map("integration_id")
-  providerAccountId String  @map("provider_account_id")
+  integrationId     String    @map("integration_id")
+  providerAccountId String    @map("provider_account_id")
   email             String
-  displayName       String? @map("display_name")
+  displayName       String?   @map("display_name")
+  /// Last failure talking to the provider, cleared by the next success; an
+  /// expired password or revoked grant surfaces here instead of failing silently
+  errorMessage      String?   @map("error_message")
+  errorAt           DateTime? @map("error_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -76,6 +82,7 @@ model ProviderCalendar {
   // Relationships
   calendarConnection     CalendarConnection @relation(fields: [calendarConnectionId], references: [id], onDelete: Cascade)
   userDefaultDestination User[]             @relation("UserDefaultDestinationCalendar")
+  holds                  CalendarHold[]
 
   // Indexes and constraints
   @@unique([calendarConnectionId, providerCalendarId], name: "connection_calendar_unique")
@@ -103,4 +110,59 @@ model ConferencingConnection {
 
   @@unique([userId, provider, providerAccountId], name: "user_provider_account_unique")
   @@map("conferencing_connections")
+}
+
+enum CalendarHoldKind {
+  /// Placeholder for a date the user said yes (or if need be) to
+  tentative
+  /// The date the organizer booked
+  confirmed
+
+  @@map("calendar_hold_kind")
+}
+
+/// An entry this app wrote into a user's calendar for a poll. Poll, option
+/// and participant are soft references: the entry has to be deleted from the
+/// calendar after they are gone, so the row must outlive them.
+model CalendarHold {
+  id                 String           @id @default(cuid())
+  userId             String           @map("user_id")
+  pollId             String           @map("poll_id")
+  optionId           String           @map("option_id")
+  kind               CalendarHoldKind
+  providerCalendarId String           @map("provider_calendar_id")
+  /// Google event id, or the URL of the CalDAV object
+  externalId         String           @map("external_id")
+  etag               String?
+  uid                String
+  /// Hash of the content last written, so an unchanged entry is not rewritten
+  contentHash        String           @map("content_hash")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerCalendar ProviderCalendar @relation(fields: [providerCalendarId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pollId, optionId], name: "user_poll_option_unique")
+  @@index([pollId])
+  @@index([providerCalendarId])
+  @@map("calendar_holds")
+}
+
+/// How a user's calendar takes part in polls they answer.
+model CalendarPreferences {
+  userId       String   @id @map("user_id")
+  /// Write tentative entries for the dates the user says yes to
+  holdsEnabled Boolean  @default(true) @map("holds_enabled")
+  /// Also write them for "if need be" answers
+  holdIfNeedBe Boolean  @default(true) @map("hold_if_need_be")
+  /// Fill in a new response from the calendar
+  autoPrefill  Boolean  @default(true) @map("auto_prefill")
+  /// The answer suggested for a date with a conflict: "no" or "ifNeedBe"
+  busyVote     String   @default("no") @map("busy_vote")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_preferences")
 }

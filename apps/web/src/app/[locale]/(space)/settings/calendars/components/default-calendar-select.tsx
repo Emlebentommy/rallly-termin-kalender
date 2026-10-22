@@ -40,6 +40,16 @@ export function DefaultCalendarSelect() {
     );
   };
 
+  // Entries can only go where the account may write
+  const writable = (connections ?? [])
+    .map((connection) => ({
+      ...connection,
+      providerCalendars: connection.providerCalendars.filter(
+        (calendar) => calendar.isWritable,
+      ),
+    }))
+    .filter((connection) => connection.providerCalendars.length > 0);
+
   return (
     <Select
       items={{
@@ -50,7 +60,7 @@ export function DefaultCalendarSelect() {
           />
         ),
         ...Object.fromEntries(
-          (connections ?? []).flatMap((connection) =>
+          writable.flatMap((connection) =>
             connection.providerCalendars.map((calendar) => [
               calendar.id,
               calendar.name,
@@ -58,7 +68,7 @@ export function DefaultCalendarSelect() {
           ),
         ),
       }}
-      defaultValue={defaultCalendar?.defaultDestinationCalendarId ?? NONE_VALUE}
+      value={defaultCalendar?.defaultDestinationCalendarId ?? NONE_VALUE}
       onValueChange={(value) => {
         if (value) {
           onValueChange(value);
@@ -76,9 +86,11 @@ export function DefaultCalendarSelect() {
             defaults="No calendar selected"
           />
         </SelectItem>
-        {connections?.map((connection) => (
+        {writable.map((connection) => (
           <SelectGroup key={connection.id}>
-            <SelectLabel>{connection.email}</SelectLabel>
+            <SelectLabel>
+              {connection.displayName ?? connection.email}
+            </SelectLabel>
             {connection.providerCalendars.map((calendar) => (
               <SelectItem key={calendar.id} value={calendar.id}>
                 {calendar.name}

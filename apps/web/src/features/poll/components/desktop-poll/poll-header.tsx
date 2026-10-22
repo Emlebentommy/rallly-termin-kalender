@@ -2,6 +2,7 @@ import { cn } from "@rallly/ui";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@rallly/ui/tooltip";
 import { ClockIcon } from "lucide-react";
 import type * as React from "react";
+import { OptionCalendarStatus } from "@/features/poll/components/poll-calendar/option-calendar-status";
 import { useOptions } from "@/features/poll/components/poll-context";
 import { ConnectedScoreSummary } from "@/features/poll/components/score-summary";
 
@@ -158,6 +159,7 @@ const PollHeader = () => {
                   />
                 ) : null}
                 <ConnectedScoreSummary optionId={option.optionId} />
+                <OptionCalendarStatus optionId={option.optionId} />
               </div>
             </th>
           );

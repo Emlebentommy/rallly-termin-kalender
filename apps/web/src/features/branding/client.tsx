@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import type { ThemePresetId, ThemeTokens } from "./constants";
 
 export interface BrandingConfig {
   primaryColor: {
@@ -16,6 +17,12 @@ export interface BrandingConfig {
   logoIcon: string;
   hideAttribution: boolean;
   appName: string;
+  theme: {
+    preset: ThemePresetId;
+    tokens: ThemeTokens;
+    /** Stylesheet applying the theme, rendered once in the root layout. */
+    css: string;
+  };
 }
 
 const BrandingContext = React.createContext<BrandingConfig | undefined>(

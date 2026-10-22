@@ -6,6 +6,7 @@ import { TooltipProvider } from "@rallly/ui/tooltip";
 import { domAnimation, LazyMotion } from "motion/react";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import type React from "react";
 import { Suspense } from "react";
@@ -26,9 +27,41 @@ import { featureFlagConfig } from "@/lib/feature-flags/config";
 import { ThemeProvider } from "@/lib/theme";
 import { TRPCProvider } from "@/trpc/client/provider";
 
+// Both faces register as CSS variables; the instance theme picks one as
+// --font-sans (features/branding/utils.ts).
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
+  variable: "--font-inter",
+});
+
+// PT Sans (SIL Open Font License), the body face of the party's corporate
+// design. Bundled rather than fetched from Google at build time.
+const ptSans = localFont({
+  src: [
+    {
+      path: "../../fonts/pt-sans/pt-sans-latin-400-normal.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/pt-sans/pt-sans-latin-400-italic.woff2",
+      weight: "400",
+      style: "italic",
+    },
+    {
+      path: "../../fonts/pt-sans/pt-sans-latin-700-normal.woff2",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/pt-sans/pt-sans-latin-700-italic.woff2",
+      weight: "700",
+      style: "italic",
+    },
+  ],
+  display: "swap",
+  variable: "--font-pt-sans",
 });
 
 export const viewport: Viewport = {
@@ -75,7 +108,7 @@ export default async function Root({
   return (
     <html
       lang={locale}
-      className={inter.className}
+      className={`${inter.variable} ${ptSans.variable}`}
       suppressHydrationWarning={true}
       style={brandingStyles}
     >
@@ -83,6 +116,11 @@ export default async function Root({
         <script
           // biome-ignore lint/security/noDangerouslySetInnerHtml: static diagnostics script with no user input
           dangerouslySetInnerHTML={{ __html: chunkRegistrationLogScript }}
+        />
+        <style
+          id="instance-theme"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: generated from validated design settings; admin CSS is stripped of </style
+          dangerouslySetInnerHTML={{ __html: brandingConfig.theme.css }}
         />
       </head>
       <body>
