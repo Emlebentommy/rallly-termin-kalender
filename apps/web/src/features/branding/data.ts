@@ -3,7 +3,6 @@ import "server-only";
 import { cache } from "react";
 import { env } from "@/env";
 import { getInstanceSettings } from "@/features/instance-settings/data";
-import { isSelfHosted } from "@/lib/constants";
 import { isMaintenanceModeEnabled } from "@/lib/maintenance";
 import { getDesignAssetUrl } from "@/lib/storage/resolve-storage-url";
 import { resolveBrandingConfig } from "./utils";
@@ -14,7 +13,9 @@ function getDefaultBrandingConfig() {
 
 function getEnvBrandingValues() {
   return {
-    appName: env.APP_NAME,
+    // The env schema defaults APP_NAME to "Rallly"; only an operator-set
+    // value may override the instance default
+    appName: process.env.APP_NAME ? env.APP_NAME : undefined,
     primaryColor: env.PRIMARY_COLOR,
     primaryColorDark: env.PRIMARY_COLOR_DARK,
     logo: env.LOGO_URL,
@@ -25,12 +26,10 @@ function getEnvBrandingValues() {
 }
 
 export async function getCustomBrandingConfig() {
-  // Cloud keeps the env-only path; maintenance mode keeps skipping the
-  // database so the maintenance page can render while it's unreachable
-  const db =
-    isSelfHosted && !isMaintenanceModeEnabled()
-      ? await getInstanceSettings()
-      : null;
+  // The fork is self-hosted only, so the stored design applies in every
+  // mode; maintenance mode keeps skipping the database so the maintenance
+  // page can render while it's unreachable
+  const db = isMaintenanceModeEnabled() ? null : await getInstanceSettings();
 
   const fontAsset = (
     key: "fontBody" | "fontHeading",
@@ -55,7 +54,7 @@ export async function getCustomBrandingConfig() {
  * instance's own design without the upstream white label license check.
  */
 export const getInstanceBrandingConfig = cache(async () => {
-  if (isSelfHosted && isMaintenanceModeEnabled()) {
+  if (isMaintenanceModeEnabled()) {
     // The maintenance page must render while the database is unreachable
     return getDefaultBrandingConfig();
   }

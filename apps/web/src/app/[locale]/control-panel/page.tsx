@@ -103,15 +103,15 @@ export default async function AdminPage() {
                 <Trans i18nKey="license" defaults="License" />
               </TileTitle>
             </Tile>
-            {/* BRANDING */}
-            <Tile render={<Link href="/control-panel/branding" />}>
+            {/* DESIGN */}
+            <Tile render={<Link href="/control-panel/design" />}>
               <div className="flex justify-between">
                 <PageIcon>
                   <PaletteIcon />
                 </PageIcon>
               </div>
               <TileTitle>
-                <Trans i18nKey="branding" defaults="Branding" />
+                <Trans i18nKey="design" defaults="Design" />
               </TileTitle>
             </Tile>
             {/* INSTANCE SETTINGS */}

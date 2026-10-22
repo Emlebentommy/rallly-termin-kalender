@@ -1,5 +1,4 @@
 import { cn } from "@rallly/ui";
-import { env } from "@/env";
 import {
   DefaultLogo,
   DefaultWordmark,
@@ -53,13 +52,13 @@ export const Logo = async ({
         {/* biome-ignore lint/performance/noImgElement: we don't need Image component here */}
         <img
           src={logo.light}
-          alt={env.APP_NAME}
+          alt={appName}
           className="block max-h-full max-w-full object-contain dark:hidden"
         />
         {/* biome-ignore lint/performance/noImgElement: we don't need Image component here */}
         <img
           src={logo.dark}
-          alt={env.APP_NAME}
+          alt={appName}
           className="hidden max-h-full max-w-full object-contain dark:block"
         />
       </div>
@@ -74,7 +73,7 @@ export const Logo = async ({
       {/* biome-ignore lint/performance/noImgElement: we don't need Image component here */}
       <img
         src={logo.light}
-        alt={env.APP_NAME}
+        alt={appName}
         className="block h-full w-auto object-contain dark:hidden"
         style={{
           height: sizes[size].height,
@@ -83,7 +82,7 @@ export const Logo = async ({
       {/* biome-ignore lint/performance/noImgElement: we don't need Image component here */}
       <img
         src={logo.dark}
-        alt={env.APP_NAME}
+        alt={appName}
         className="hidden h-full w-auto object-contain dark:block"
         style={{
           height: sizes[size].height,

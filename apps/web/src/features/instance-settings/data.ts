@@ -131,3 +131,10 @@ export async function getInstanceAsset(key: string) {
     select: { mimeType: true, data: true, updatedAt: true },
   });
 }
+
+/** Metadata of every uploaded design file, for the design settings page. */
+export async function listInstanceAssets() {
+  return await prisma.instanceAsset.findMany({
+    select: { key: true, fileName: true, mimeType: true, updatedAt: true },
+  });
+}

@@ -53,9 +53,9 @@ export async function ControlPanelSidebar(
               <KeySquareIcon className="size-4" />
               <Trans i18nKey="license" defaults="License" />
             </NavItem>
-            <NavItem href="/control-panel/branding">
+            <NavItem href="/control-panel/design">
               <PaletteIcon className="size-4" />
-              <Trans i18nKey="branding" defaults="Branding" />
+              <Trans i18nKey="design" defaults="Design" />
             </NavItem>
             <NavItem href="/control-panel/settings">
               <SettingsIcon className="size-4" />

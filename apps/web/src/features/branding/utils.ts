@@ -3,6 +3,7 @@ import { adjustColorForContrast, getForegroundColor } from "@/lib/utils/color";
 import type { BrandingConfig } from "./client";
 import type {
   BodyFont,
+  DesignAssetKey,
   HeadingFont,
   NeutralTone,
   Radius,
@@ -167,6 +168,40 @@ export function getNeutralScaleVars(tone: NeutralTone): Record<string, string> {
   return vars;
 }
 
+// Tailwind's zinc chroma, for previews of the neutral tone (the app itself
+// keeps the built-in scale for it).
+const ZINC_CHROMA: Record<number, number> = {
+  50: 0,
+  100: 0.001,
+  200: 0.004,
+  300: 0.006,
+  400: 0.015,
+  500: 0.016,
+  600: 0.017,
+  700: 0.013,
+  800: 0.006,
+  900: 0.006,
+  950: 0.005,
+};
+
+/** One step of a tone's neutral scale as a CSS color, for previews. */
+export function getNeutralColor(
+  tone: NeutralTone,
+  step: (typeof NEUTRAL_STEPS)[number][0],
+) {
+  const lightness = NEUTRAL_STEPS.find(([s]) => s === step)?.[1] ?? 0.5;
+  if (tone === "neutral") {
+    return `oklch(${lightness} ${ZINC_CHROMA[step]} 286)`;
+  }
+  const tint = NEUTRAL_TINTS[tone];
+  return `oklch(${lightness} ${tint.chroma[step]} ${tint.hue})`;
+}
+
+/** Corner radius in px for a base radius token of `rem` at this setting. */
+export function scaleRadius(radius: Radius, rem: number) {
+  return rem * RADIUS_FACTOR[radius] * 16;
+}
+
 // Tailwind's default radius scale in rem, scaled as one so components keep
 // their relative rounding.
 const RADIUS_SCALE = {
@@ -275,8 +310,10 @@ function declarations(vars: Record<string, string>) {
     .join("");
 }
 
+// Page and dialog titles only: display faces such as GrueneType are made for
+// headlines, and section labels (h2) stay in the body face.
 const HEADING_SELECTOR =
-  'h1,h2,[data-slot="dialog-title"],[data-slot="sheet-title"]';
+  'h1,[data-slot="dialog-title"],[data-slot="sheet-title"]';
 
 /**
  * The stylesheet that applies a theme to the whole app. Selectors are one
@@ -418,3 +455,49 @@ export function resolveBrandingConfig({
     },
   };
 }
+
+const startsWith = (bytes: Uint8Array, signature: number[], offset = 0) =>
+  signature.every((byte, index) => bytes[offset + index] === byte);
+
+const ascii = (text: string) => [...text].map((char) => char.charCodeAt(0));
+
+/**
+ * The type of an uploaded design file, read from its first bytes. The type a
+ * browser reports for a file is taken from its name, so it is not trusted:
+ * the stored type decides how every visitor's browser treats the file.
+ */
+export function detectDesignAssetMimeType(bytes: Uint8Array) {
+  if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47])) return "image/png";
+  if (startsWith(bytes, [0xff, 0xd8, 0xff])) return "image/jpeg";
+  if (startsWith(bytes, ascii("RIFF")) && startsWith(bytes, ascii("WEBP"), 8))
+    return "image/webp";
+  if (startsWith(bytes, ascii("wOF2"))) return "font/woff2";
+  if (startsWith(bytes, ascii("wOFF"))) return "font/woff";
+  if (startsWith(bytes, ascii("OTTO"))) return "font/otf";
+  if (
+    startsWith(bytes, [0x00, 0x01, 0x00, 0x00]) ||
+    startsWith(bytes, ascii("true"))
+  )
+    return "font/ttf";
+  const head = new TextDecoder().decode(bytes.subarray(0, 1024)).trimStart();
+  if (
+    /^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE svg[^>]*>\s*)?<svg[\s>]/i.test(
+      head,
+    )
+  )
+    return "image/svg+xml";
+  return null;
+}
+
+const FONT_TYPES = ["font/woff2", "font/woff", "font/ttf", "font/otf"];
+const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+
+/** Which file types each design slot accepts. */
+export const DESIGN_ASSET_TYPES: Record<DesignAssetKey, string[]> = {
+  logo: LOGO_TYPES,
+  logoDark: LOGO_TYPES,
+  // The icon goes into emails, where SVG and WebP render unreliably
+  logoIcon: ["image/png", "image/jpeg"],
+  fontBody: FONT_TYPES,
+  fontHeading: FONT_TYPES,
+};

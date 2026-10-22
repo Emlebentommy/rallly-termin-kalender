@@ -278,7 +278,7 @@ describe("buildThemeCss", () => {
     const css = buildThemeCss({ tokens: THEME_PRESETS.gruene });
 
     expect(css).not.toContain("@font-face");
-    expect(css).not.toContain("h1,h2");
+    expect(css).not.toContain("h1,");
   });
 
   it("registers an uploaded heading font and drops synthesized bold", () => {
