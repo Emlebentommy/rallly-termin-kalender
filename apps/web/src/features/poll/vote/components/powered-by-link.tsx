@@ -1,7 +1,7 @@
 "use client";
 import { posthog } from "@rallly/posthog/client";
 import { Link } from "@/components/link";
-import LogoWordmark from "@/features/branding/assets/logo.svg";
+import LogoWordmark from "@/features/branding/assets/rallly-wordmark.svg";
 import { DEFAULT_APP_NAME } from "@/features/branding/constants";
 import { Trans } from "@/i18n/client";
 

@@ -6,15 +6,32 @@ import {
   DEFAULT_LOGO_URL,
   DEFAULT_LOGO_URL_DARK,
   DEFAULT_PRIMARY_COLOR,
+  GRUENE_COLORS,
+  THEME_PRESETS,
 } from "./constants";
-import { getPrimaryColorVars, resolveBrandingConfig } from "./utils";
+import {
+  buildThemeCss,
+  getNeutralScaleVars,
+  getPrimaryColorVars,
+  getRadiusVars,
+  resolveBrandingConfig,
+  resolveThemeTokens,
+  sanitizeCustomCss,
+} from "./utils";
 
 describe("resolveBrandingConfig", () => {
   it("returns the default config when no sources are provided", () => {
     const config = resolveBrandingConfig({});
+    const defaults = getPrimaryColorVars(DEFAULT_PRIMARY_COLOR);
 
-    expect(config).toEqual({
-      primaryColor: getPrimaryColorVars(DEFAULT_PRIMARY_COLOR),
+    expect(config).toMatchObject({
+      primaryColor: {
+        light: defaults.light,
+        lightForeground: defaults.lightForeground,
+        // The default preset pairs Tanne with Sonne in dark mode
+        dark: GRUENE_COLORS.sonne,
+        darkForeground: getForegroundColor(GRUENE_COLORS.sonne),
+      },
       logo: {
         light: DEFAULT_LOGO_URL,
         dark: DEFAULT_LOGO_URL_DARK,
@@ -22,7 +39,18 @@ describe("resolveBrandingConfig", () => {
       logoIcon: DEFAULT_LOGO_ICON_URL,
       hideAttribution: false,
       appName: DEFAULT_APP_NAME,
+      theme: { preset: "gruene" },
     });
+  });
+
+  it("resolves design asset references to the asset route", () => {
+    const config = resolveBrandingConfig({
+      db: { logo: "asset:logo:1700000000000" },
+    });
+
+    expect(config.logo.light).toContain(
+      "/api/instance-assets/logo?v=1700000000000",
+    );
   });
 
   it("uses env values when the db values are unset", () => {
@@ -166,5 +194,138 @@ describe("resolveBrandingConfig", () => {
     expect(config.primaryColor.light).toEqual(
       getPrimaryColorVars("#336699").light,
     );
+  });
+});
+
+describe("resolveThemeTokens", () => {
+  it("uses the default preset when nothing is stored", () => {
+    expect(resolveThemeTokens({})).toEqual({
+      preset: "gruene",
+      tokens: THEME_PRESETS.gruene,
+    });
+  });
+
+  it("overrides single tokens on top of the preset", () => {
+    const { preset, tokens } = resolveThemeTokens({
+      themePreset: "rallly",
+      radius: "large",
+      accentColor: "#123456",
+    });
+
+    expect(preset).toBe("rallly");
+    expect(tokens).toEqual({
+      ...THEME_PRESETS.rallly,
+      radius: "large",
+      accentColor: "#123456",
+    });
+  });
+
+  it("starts the custom preset from the default preset", () => {
+    expect(resolveThemeTokens({ themePreset: "custom" }).tokens).toEqual(
+      THEME_PRESETS.gruene,
+    );
+  });
+
+  it("ignores unknown or malformed stored values", () => {
+    const { preset, tokens } = resolveThemeTokens({
+      themePreset: "neon",
+      neutralTone: "purple",
+      accentColor: "red",
+      fontBody: "comic-sans",
+    });
+
+    expect(preset).toBe("gruene");
+    expect(tokens).toEqual(THEME_PRESETS.gruene);
+  });
+});
+
+describe("getNeutralScaleVars", () => {
+  it("keeps the built-in zinc scale for the neutral tone", () => {
+    expect(getNeutralScaleVars("neutral")).toEqual({});
+  });
+
+  it("tints every step of the scale", () => {
+    const vars = getNeutralScaleVars("green");
+
+    expect(vars["--gray-hue"]).toBe("158");
+    expect(Object.keys(vars)).toHaveLength(12);
+    expect(vars["--color-gray-100"]).toMatch(/^oklch\(0\.967 [\d.]+ 158\)$/);
+  });
+});
+
+describe("getRadiusVars", () => {
+  it("keeps the default scale for medium", () => {
+    expect(getRadiusVars("medium")).toEqual({});
+  });
+
+  it("scales every radius token together", () => {
+    expect(getRadiusVars("none")["--radius-lg"]).toBe("0rem");
+    expect(getRadiusVars("large")["--radius-lg"]).toBe("0.75rem");
+  });
+});
+
+describe("buildThemeCss", () => {
+  it("sets the body font, accent and neutral scale on the root", () => {
+    const css = buildThemeCss({ tokens: THEME_PRESETS.gruene });
+
+    expect(css).toContain("html:root{");
+    expect(css).toContain("--font-sans:var(--font-pt-sans)");
+    expect(css).toContain(`--brand-accent:${GRUENE_COLORS.sonne}`);
+    expect(css).toContain("--color-gray-50:oklch(");
+  });
+
+  it("falls back to the body font when no heading font is uploaded", () => {
+    const css = buildThemeCss({ tokens: THEME_PRESETS.gruene });
+
+    expect(css).not.toContain("@font-face");
+    expect(css).not.toContain("h1,h2");
+  });
+
+  it("registers an uploaded heading font and drops synthesized bold", () => {
+    const css = buildThemeCss({
+      tokens: THEME_PRESETS.gruene,
+      assets: {
+        fontHeading: {
+          url: "https://example.com/api/instance-assets/fontHeading?v=1",
+          mimeType: "font/woff",
+        },
+      },
+    });
+
+    expect(css).toContain(
+      '@font-face{font-family:"Instance Heading";src:url("https://example.com/api/instance-assets/fontHeading?v=1") format("woff")',
+    );
+    expect(css).toContain("font-weight:400;font-synthesis:none");
+  });
+
+  it("only overrides the background of the mode it was set for", () => {
+    const css = buildThemeCss({
+      tokens: { ...THEME_PRESETS.gruene, backgroundColor: "#f5f1e9" },
+    });
+
+    expect(css).toContain("html:root:not(.dark){--background:#f5f1e9;}");
+    expect(css).not.toContain("html.dark:root");
+  });
+
+  it("appends custom CSS last", () => {
+    const css = buildThemeCss({
+      tokens: THEME_PRESETS.gruene,
+      customCss: ".poll-title{letter-spacing:1px}",
+    });
+
+    expect(css.endsWith(".poll-title{letter-spacing:1px}")).toBe(true);
+  });
+});
+
+describe("sanitizeCustomCss", () => {
+  it("cannot close the style element it is rendered into", () => {
+    expect(
+      sanitizeCustomCss("a{}</style><script>alert(1)</script>"),
+    ).not.toMatch(/<\/style/i);
+    expect(sanitizeCustomCss("a{}</STYLE >")).not.toMatch(/<\/style/i);
+  });
+
+  it("returns an empty string for nothing", () => {
+    expect(sanitizeCustomCss(null)).toBe("");
   });
 });

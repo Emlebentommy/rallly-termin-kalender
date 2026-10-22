@@ -1,6 +1,6 @@
 {
-  "short_name": "Rallly",
-  "name": "Rallly",
+  "short_name": "Termine",
+  "name": "Termine",
   "icons": [
     {
       "src": "android-chrome-192x192.png",
@@ -13,24 +13,9 @@
       "type": "image/png"
     }
   ],
-  "screenshots": [
-    {
-      "src": "screenshots/home.webp",
-      "sizes": "1280x720",
-      "type": "image/webp",
-      "form_factor": "wide",
-      "label": "Home screen"
-    },
-    {
-      "src": "screenshots/poll.webp",
-      "sizes": "1280x720",
-      "type": "image/webp",
-      "label": "Poll screen"
-    }
-  ],
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
-  "theme_color": "#4f46e5"
+  "theme_color": "#005538"
 }

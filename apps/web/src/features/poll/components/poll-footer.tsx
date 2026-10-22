@@ -4,7 +4,7 @@ import { cn } from "@rallly/ui";
 import type React from "react";
 import { InstanceFooterLinks } from "@/components/instance-footer-links";
 import { Link } from "@/components/link";
-import LogoWordmark from "@/features/branding/assets/logo.svg";
+import LogoWordmark from "@/features/branding/assets/rallly-wordmark.svg";
 import { useBranding } from "@/features/branding/client";
 import { DEFAULT_APP_NAME } from "@/features/branding/constants";
 import { usePoll } from "@/features/poll/client";

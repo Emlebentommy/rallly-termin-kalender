@@ -42,10 +42,45 @@ export const getInstanceSettings = unstable_cache(
         logoIcon: true,
         hideAttribution: true,
         footerLinks: true,
+        themePreset: true,
+        accentColor: true,
+        backgroundColor: true,
+        backgroundColorDark: true,
+        neutralTone: true,
+        fontBody: true,
+        fontHeading: true,
+        radius: true,
+        customCss: true,
       },
     });
 
+    // Metadata only: the bytes are read by the asset route, not by every page
+    const fontAssets = await prisma.instanceAsset.findMany({
+      where: { key: { in: ["fontBody", "fontHeading"] } },
+      select: { key: true, mimeType: true, updatedAt: true },
+    });
+    const fontAsset = (key: string) => {
+      const asset = fontAssets.find((entry) => entry.key === key);
+      // A number, not a Date: the cache serializes its result
+      return asset
+        ? { mimeType: asset.mimeType, version: asset.updatedAt.getTime() }
+        : null;
+    };
+
     return {
+      themePreset: instanceSettings?.themePreset ?? null,
+      accentColor: instanceSettings?.accentColor ?? null,
+      backgroundColor: instanceSettings?.backgroundColor ?? null,
+      backgroundColorDark: instanceSettings?.backgroundColorDark ?? null,
+      neutralTone: instanceSettings?.neutralTone ?? null,
+      fontBody: instanceSettings?.fontBody ?? null,
+      fontHeading: instanceSettings?.fontHeading ?? null,
+      radius: instanceSettings?.radius ?? null,
+      customCss: instanceSettings?.customCss ?? null,
+      fontAssets: {
+        fontBody: fontAsset("fontBody"),
+        fontHeading: fontAsset("fontHeading"),
+      },
       instanceId: instanceSettings?.instanceId ?? null,
       disableUserRegistration:
         instanceSettings?.disableUserRegistration ?? false,
@@ -87,4 +122,12 @@ export async function isRegistrationOpen() {
   });
 
   return !instanceSettings?.disableUserRegistration;
+}
+
+/** One uploaded design file with its bytes, for the asset route. */
+export async function getInstanceAsset(key: string) {
+  return await prisma.instanceAsset.findUnique({
+    where: { key },
+    select: { mimeType: true, data: true, updatedAt: true },
+  });
 }

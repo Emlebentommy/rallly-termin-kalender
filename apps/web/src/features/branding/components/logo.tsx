@@ -27,19 +27,19 @@ export const Logo = async ({
   className?: string;
   size?: keyof typeof sizes | "fit";
 }) => {
-  const { logo } = await getInstanceBrandingConfig();
+  const { logo, appName } = await getInstanceBrandingConfig();
 
   // The default logo is inlined; only a custom one is fetched as an image
   if (logo.light === DEFAULT_LOGO_URL && logo.dark === DEFAULT_LOGO_URL_DARK) {
     if (size === "fit") {
-      return <DefaultLogo className={className} />;
+      return <DefaultLogo className={className} appName={appName} />;
     }
     return (
       <div
         className={cn("inline-block", className)}
         style={{ height: sizes[size].height }}
       >
-        <DefaultWordmark className="h-full w-auto" />
+        <DefaultWordmark height={sizes[size].height} appName={appName} />
       </div>
     );
   }

@@ -21,11 +21,40 @@ export function isStorageKey(value: string): boolean {
   return !(
     value.startsWith("https://") ||
     value.startsWith("http://") ||
-    value.startsWith("data:")
+    value.startsWith("data:") ||
+    isDesignAssetRef(value)
   );
 }
 
+/**
+ * Files uploaded in the design settings live in the database rather than the
+ * bucket. A stored value `asset:<key>:<version>` points at one of them; the
+ * version is the upload time, so the URL changes whenever the file does and
+ * the route can be cached as immutable.
+ */
+const DESIGN_ASSET_PREFIX = "asset:";
+
+export function isDesignAssetRef(value: string) {
+  return value.startsWith(DESIGN_ASSET_PREFIX);
+}
+
+export function toDesignAssetRef(key: string, version: number) {
+  return `${DESIGN_ASSET_PREFIX}${key}:${version}`;
+}
+
+export function getDesignAssetUrl(key: string, version?: number) {
+  const path = `/api/instance-assets/${encodeURIComponent(key)}`;
+  return absoluteUrl(version ? `${path}?v=${version}` : path);
+}
+
 export function resolveStorageUrl(key: string): string {
+  if (isDesignAssetRef(key)) {
+    const [assetKey = "", version] = key
+      .slice(DESIGN_ASSET_PREFIX.length)
+      .split(":");
+    return getDesignAssetUrl(assetKey, Number(version) || undefined);
+  }
+
   if (!isStorageKey(key)) {
     return key;
   }

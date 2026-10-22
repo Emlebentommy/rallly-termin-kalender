@@ -126,9 +126,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // /api/storage sets its own CSP (sandbox + frame-ancestors) per
-        // response; a config header for the same key would override it
-        source: "/((?!api/storage).*)",
+        // /api/storage and /api/instance-assets set their own CSP (sandbox +
+        // frame-ancestors) per response; a config header for the same key
+        // would override it
+        source: "/((?!api/storage|api/instance-assets).*)",
         headers: [
           {
             key: "Content-Security-Policy",
